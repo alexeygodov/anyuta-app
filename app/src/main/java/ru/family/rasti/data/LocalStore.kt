@@ -23,8 +23,8 @@ class LocalStore(private val context: Context) {
     }
 
     fun loadGitHubConfig(): GitHubConfig = GitHubConfig(
-        owner = settings.getString("owner", "") ?: "",
-        repo = settings.getString("repo", "") ?: "",
+        owner = settings.getString("owner", "alexeygodov") ?: "alexeygodov",
+        repo = settings.getString("repo", "anyuta-data") ?: "anyuta-data",
         branch = settings.getString("branch", "main") ?: "main",
         token = tokenStore.load(),
     )

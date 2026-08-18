@@ -53,8 +53,8 @@ data class AppData(
 )
 
 data class GitHubConfig(
-    val owner: String = "",
-    val repo: String = "",
+    val owner: String = "alexeygodov",
+    val repo: String = "anyuta-data",
     val branch: String = "main",
     val token: String = "",
 )
