@@ -1,5 +1,6 @@
 package ru.family.rasti.ui
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Button
@@ -20,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -41,6 +45,7 @@ import java.time.LocalDate
 
 @Composable
 fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
     val currentProfile = viewModel.data.profile
     var childName by remember(currentProfile) { mutableStateOf(currentProfile.name) }
     var birthDate by remember(currentProfile) {
@@ -55,6 +60,10 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var token by remember(currentConfig) { mutableStateOf(currentConfig.token) }
 
     val config = GitHubConfig(owner.trim(), repo.trim(), branch.trim(), token.trim())
+    val tokenOwner = owner.trim().ifBlank { "alexeygodov" }
+    val tokenUrl = "https://github.com/settings/personal-access-tokens/new" +
+        "?name=Anyuta-phone&description=Anyuta-data-sync" +
+        "&target_name=${Uri.encode(tokenOwner)}&expires_in=366&contents=write"
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -101,9 +110,21 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             SettingsCard("Синхронизация через GitHub") {
                 Text(
-                    "Создайте отдельный приватный репозиторий данных с README. " +
-                        "Приложение будет хранить в нём profile.json и по одному JSON-файлу на день.",
+                    "Здесь нужен не SSH-ключ и не пароль, а отдельный fine-grained personal access token. " +
+                        "Он разрешит приложению читать и записывать только данные в anyuta-data.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedButton(
+                    onClick = { uriHandler.openUri(tokenUrl) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+                    Text("  Создать токен на GitHub")
+                }
+                Text(
+                    "На открывшейся странице выберите Repository access → Only select repositories → anyuta-data. " +
+                        "Для Contents оставьте Read and write, нажмите Generate token и сразу скопируйте результат.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedTextField(owner, { owner = it }, label = { Text("Владелец: username") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(repo, { repo = it }, label = { Text("Репозиторий: anyuta-data") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
@@ -111,7 +132,8 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 OutlinedTextField(
                     token,
                     { token = it },
-                    label = { Text("Fine-grained token") },
+                    label = { Text("Токен доступа GitHub") },
+                    supportingText = { Text("Вставьте строку, которая обычно начинается с github_pat_.") },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
@@ -119,7 +141,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(
-                        "Токен шифруется Android Keystore и не записывается в JSON или Git.",
+                        "Токен хранится только на этом телефоне, шифруется Android Keystore и не записывается в JSON или Git. Не отправляйте его в чат.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -140,7 +162,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     Text(if (viewModel.syncing) "  Синхронизация…" else "  Сохранить и синхронизировать")
                 }
                 Text(
-                    "Права token: только выбранный data-репозиторий, Contents — Read and write.",
+                    "SSH-ключ, который вы добавляли в аккаунт GitHub, нужен компьютеру для git push. Приложение Android использует токен выше.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

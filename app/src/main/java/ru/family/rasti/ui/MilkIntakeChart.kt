@@ -25,7 +25,7 @@ import kotlin.math.max
 private data class IntakePoint(val minute: Int, val totalMl: Float)
 
 @Composable
-internal fun MilkIntakeChart(guide: MilkGuide, entries: List<FoodEntry>) {
+internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
     val actualColor = MaterialTheme.colorScheme.primary
     val rangeColor = MaterialTheme.colorScheme.tertiaryContainer
     val rangeLineColor = MaterialTheme.colorScheme.tertiary
@@ -39,33 +39,35 @@ internal fun MilkIntakeChart(guide: MilkGuide, entries: List<FoodEntry>) {
         val right = size.width - 10.dp.toPx()
         val top = 12.dp.toPx()
         val bottom = size.height - 30.dp.toPx()
-        val maxY = max(guide.maximumMl.toFloat(), consumed) * 1.12f
+        val maxY = max(max(guide?.maximumMl?.toFloat() ?: 0f, consumed), 500f) * 1.12f
 
         fun x(minute: Int): Float = left + minute.coerceIn(0, 1440) / 1440f * (right - left)
         fun y(value: Float): Float = bottom - value.coerceAtLeast(0f) / maxY * (bottom - top)
 
-        val bandTop = y(guide.maximumMl.toFloat())
-        val bandBottom = y(guide.minimumMl.toFloat())
-        drawRect(
-            color = rangeColor.copy(alpha = .75f),
-            topLeft = Offset(left, bandTop),
-            size = Size(right - left, bandBottom - bandTop),
-        )
-        val dash = PathEffect.dashPathEffect(floatArrayOf(8f, 7f))
-        drawLine(
-            rangeLineColor,
-            Offset(left, bandTop),
-            Offset(right, bandTop),
-            1.dp.toPx(),
-            pathEffect = dash,
-        )
-        drawLine(
-            rangeLineColor,
-            Offset(left, bandBottom),
-            Offset(right, bandBottom),
-            1.dp.toPx(),
-            pathEffect = dash,
-        )
+        val bandTop = guide?.let { y(it.maximumMl.toFloat()) }
+        val bandBottom = guide?.let { y(it.minimumMl.toFloat()) }
+        if (bandTop != null && bandBottom != null) {
+            drawRect(
+                color = rangeColor.copy(alpha = .75f),
+                topLeft = Offset(left, bandTop),
+                size = Size(right - left, bandBottom - bandTop),
+            )
+            val dash = PathEffect.dashPathEffect(floatArrayOf(8f, 7f))
+            drawLine(
+                rangeLineColor,
+                Offset(left, bandTop),
+                Offset(right, bandTop),
+                1.dp.toPx(),
+                pathEffect = dash,
+            )
+            drawLine(
+                rangeLineColor,
+                Offset(left, bandBottom),
+                Offset(right, bandBottom),
+                1.dp.toPx(),
+                pathEffect = dash,
+            )
+        }
 
         listOf(0, 360, 720, 1080, 1440).forEach { minute ->
             drawLine(
@@ -100,8 +102,10 @@ internal fun MilkIntakeChart(guide: MilkGuide, entries: List<FoodEntry>) {
             textSize = 10.dp.toPx()
         }
         drawContext.canvas.nativeCanvas.apply {
-            drawText("${guide.maximumMl}", 2.dp.toPx(), bandTop + 4.dp.toPx(), paint)
-            drawText("${guide.minimumMl}", 2.dp.toPx(), bandBottom + 4.dp.toPx(), paint)
+            if (guide != null && bandTop != null && bandBottom != null) {
+                drawText("${guide.maximumMl}", 2.dp.toPx(), bandTop + 4.dp.toPx(), paint)
+                drawText("${guide.minimumMl}", 2.dp.toPx(), bandBottom + 4.dp.toPx(), paint)
+            }
             listOf(0 to "0", 360 to "6", 720 to "12", 1080 to "18", 1440 to "24").forEach { (minute, label) ->
                 val labelX = (x(minute) - paint.measureText(label) / 2).coerceIn(left, right - paint.measureText(label))
                 drawText(label, labelX, size.height - 7.dp.toPx(), paint)

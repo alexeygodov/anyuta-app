@@ -279,14 +279,23 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Объём питания", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            if (guide == null) {
-                Text("Учтено: ${formatNumber(consumed)} мл")
-                Text(result.explanation, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
+            if (guide != null) {
                 val progress = (consumed / guide.targetMl).toFloat().coerceIn(0f, 1f)
                 Text("${formatNumber(consumed)} из ≈${guide.targetMl} мл")
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                MilkIntakeChart(guide, milkEntries)
+            } else {
+                Text("Учтено: ${formatNumber(consumed)} мл")
+            }
+            Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            MilkIntakeChart(guide, milkEntries)
+            if (milkEntries.isEmpty()) {
+                Text(
+                    "Нажмите «Смесь» или «Молоко» — здесь появится линия накопленного объёма.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (guide != null) {
                 Text(
                     "Цветная полоса — расчётный диапазон за сутки; тёмная линия — накопительно смесь + молоко по времени.",
                     style = MaterialTheme.typography.bodySmall,
@@ -295,8 +304,13 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
                     "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text(
+                    "Тёмная линия — смесь + молоко по времени. Цветной диапазон появится после заполнения даты рождения и веса.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
+            Text(result.explanation, style = MaterialTheme.typography.bodySmall)
             Text(
                 "Суммируются смесь и измеренное сцеженное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
                 style = MaterialTheme.typography.bodySmall,
