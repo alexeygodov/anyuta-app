@@ -1,0 +1,32 @@
+{
+  "date": "2026-08-18",
+  "food": [
+    {
+      "id": "example-food-id",
+      "time": "08:30",
+      "name": "Каша",
+      "amount": 150,
+      "unit": "г",
+      "updatedAt": "2026-08-18T08:30:00+04:00"
+    }
+  ],
+  "vitamins": [
+    {
+      "id": "example-vitamin-id",
+      "time": "09:10",
+      "name": "Витамин D",
+      "dose": "1 капля",
+      "updatedAt": "2026-08-18T09:10:00+04:00"
+    }
+  ],
+  "deletedFoodIds": [],
+  "deletedVitaminIds": [],
+  "measurement": {
+    "heightCm": 82.5,
+    "weightKg": 11.4,
+    "updatedAt": "2026-08-18T09:15:00+04:00"
+  },
+  "note": "Хороший аппетит",
+  "updatedAt": "2026-08-18T09:15:00+04:00"
+}
+
