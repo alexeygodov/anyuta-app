@@ -23,4 +23,12 @@ class TimeInputTest {
         assertEquals("10:15", adjustTimeInput("10:00", 15))
         assertEquals("23:50", adjustTimeInput("00:05", -15))
     }
+
+    @Test
+    fun normalizeMilkAmount_uses_five_ml_steps_and_limits() {
+        assertEquals(100f, normalizeMilkAmount(102f), 0f)
+        assertEquals(105f, normalizeMilkAmount(103f), 0f)
+        assertEquals(5f, normalizeMilkAmount(0f), 0f)
+        assertEquals(300f, normalizeMilkAmount(500f), 0f)
+    }
 }

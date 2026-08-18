@@ -1,5 +1,10 @@
 package ru.family.rasti.ui
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,11 +99,22 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             )
         }
         item {
+            VitaminDReminder(
+                vitaminD = vitaminD,
+                shouldPulse = selectedDate == LocalDate.now() && vitaminD == null,
+                onClick = {
+                    if (vitaminD == null && selectedDate == LocalDate.now()) {
+                        viewModel.addVitamin(selectedDate, "Витамин D", "2 капли", null)
+                    } else {
+                        vitaminEditor = VitaminEditorState(selectedDate, vitaminD, "Витамин D")
+                    }
+                },
+            )
+        }
+        item {
             QuickActions(
-                vitaminDTaken = vitaminD != null,
                 onFormula = { foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь") },
                 onMilk = { foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко") },
-                onVitaminD = { vitaminEditor = VitaminEditorState(selectedDate, vitaminD, "Витамин D") },
                 onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
             )
         }
@@ -237,10 +253,8 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun QuickActions(
-    vitaminDTaken: Boolean,
     onFormula: () -> Unit,
     onMilk: () -> Unit,
-    onVitaminD: () -> Unit,
     onMeasurement: () -> Unit,
 ) {
     Card(Modifier.fillMaxWidth()) {
@@ -250,17 +264,48 @@ private fun QuickActions(
                 Button(onClick = onFormula, modifier = Modifier.weight(1f)) { Text("Смесь") }
                 Button(onClick = onMilk, modifier = Modifier.weight(1f)) { Text("Молоко") }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton(
-                    onClick = onVitaminD,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = if (vitaminDTaken) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-                        contentColor = if (vitaminDTaken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
-                    ),
-                ) { Text(if (vitaminDTaken) "Витамин D ✓" else "Витамин D") }
-                OutlinedButton(onClick = onMeasurement, modifier = Modifier.weight(1f)) { Text("Рост / вес") }
-            }
+            OutlinedButton(onClick = onMeasurement, modifier = Modifier.fillMaxWidth()) { Text("Рост / вес") }
+        }
+    }
+}
+
+@Composable
+private fun VitaminDReminder(
+    vitaminD: VitaminEntry?,
+    shouldPulse: Boolean,
+    onClick: () -> Unit,
+) {
+    val pulseTransition = rememberInfiniteTransition(label = "vitamin-d-reminder")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = if (shouldPulse) .68f else 1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(850), repeatMode = RepeatMode.Reverse),
+        label = "vitamin-d-alpha",
+    )
+    val taken = vitaminD != null
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(72.dp),
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = if (taken) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = pulse)
+            },
+            contentColor = if (taken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                if (taken) "Витамин D принят ✓" else "Витамин D · 2 капли",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                if (taken) listOf(vitaminD.dose, vitaminD.time).filter { it.isNotBlank() }.joinToString(" · ")
+                else "Ещё не принят — нажмите, чтобы отметить",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
@@ -312,7 +357,7 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
             }
             Text(result.explanation, style = MaterialTheme.typography.bodySmall)
             Text(
-                "Суммируются смесь и измеренное сцеженное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
+                "Суммируются смесь и измеренное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

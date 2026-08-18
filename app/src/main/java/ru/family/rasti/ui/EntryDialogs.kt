@@ -1,10 +1,20 @@
 package ru.family.rasti.ui
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
@@ -13,20 +23,27 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
@@ -36,6 +53,8 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val displayDateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -53,11 +72,17 @@ internal fun FoodEditorDialog(
     val stateKey = initial?.id ?: "$fixedName-$initialDate"
     var name by rememberSaveable(stateKey) { mutableStateOf(initial?.name ?: fixedName.orEmpty()) }
     var amount by rememberSaveable(stateKey) { mutableStateOf(initial?.amount?.let(::formatNumber).orEmpty()) }
+    val feedingName = (fixedName ?: initial?.name).orEmpty().trim().lowercase()
+    val feedingUnit = (fixedUnit ?: initial?.unit).orEmpty().trim().lowercase()
+    val usesMilkSlider = feedingUnit in setOf("мл", "ml") && feedingName in setOf("молоко", "смесь")
+    var milkAmount by rememberSaveable(stateKey) {
+        mutableStateOf(normalizeMilkAmount((initial?.amount ?: 100.0).toFloat()))
+    }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initial?.unit ?: fixedUnit ?: "г") }
     var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
-    val amountNumber = amount.replace(',', '.').toDoubleOrNull()
+    val amountNumber = if (usesMilkSlider) milkAmount.toDouble() else amount.replace(',', '.').toDoubleOrNull()
     val normalizedTime = normalizeTimeInput(time)
 
     AlertDialog(
@@ -70,24 +95,46 @@ internal fun FoodEditorDialog(
                 } else {
                     Text(fixedName)
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        amount,
-                        { amount = it },
-                        label = { Text("Количество") },
-                        suffix = { Text(fixedUnit ?: unit) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
+                if (usesMilkSlider) {
+                    Text(
+                        "${milkAmount.roundToInt()} мл",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
                     )
-                    if (fixedUnit == null) {
+                    Slider(
+                        value = milkAmount,
+                        onValueChange = { milkAmount = normalizeMilkAmount(it) },
+                        valueRange = 5f..300f,
+                        steps = 58,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("5 мл", style = MaterialTheme.typography.bodySmall)
+                        Text("Шаг 5 мл", style = MaterialTheme.typography.bodySmall)
+                        Text("300 мл", style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
-                            unit,
-                            { unit = it },
-                            label = { Text("Единица") },
-                            modifier = Modifier.weight(.72f),
+                            amount,
+                            { amount = it },
+                            label = { Text("Количество") },
+                            suffix = { Text(unit) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f),
                             singleLine = true,
                         )
+                        if (fixedUnit == null) {
+                            OutlinedTextField(
+                                unit,
+                                { unit = it },
+                                label = { Text("Единица") },
+                                modifier = Modifier.weight(.72f),
+                                singleLine = true,
+                            )
+                        }
                     }
                 }
                 DateTimePickerRow(
@@ -263,48 +310,117 @@ internal fun DatePickerButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
-    val parts = time.split(":", limit = 2)
-    val hours = parts.getOrElse(0) { "" }
-    val minutes = parts.getOrElse(1) { "" }
-    val valid = normalizeTimeInput(time) != null
+    val selected = normalizeTimeInput(time)?.let { LocalTime.parse(it, timeFormatter) } ?: LocalTime.now()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Schedule, contentDescription = null)
-            Text("  Время", style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+            Text("  Время — прокрутите вверх или вниз", style = MaterialTheme.typography.labelLarge)
         }
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = hours,
-                onValueChange = { value -> onTimeChange("${value.filter(Char::isDigit).take(2)}:$minutes") },
-                label = { Text("Часы") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = !valid,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center),
-                modifier = Modifier.weight(1f),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NumberWheel(
+                values = 0..23,
+                selectedValue = selected.hour,
+                contentDescription = "Часы",
+                onValueSelected = { hour ->
+                    onTimeChange(LocalTime.of(hour, selected.minute).format(timeFormatter))
+                },
             )
-            Text(" : ")
-            OutlinedTextField(
-                value = minutes,
-                onValueChange = { value -> onTimeChange("$hours:${value.filter(Char::isDigit).take(2)}") },
-                label = { Text("Минуты") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = !valid,
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center),
-                modifier = Modifier.weight(1f),
+            Text(" : ", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            NumberWheel(
+                values = 0..59,
+                selectedValue = selected.minute,
+                contentDescription = "Минуты",
+                onValueSelected = { minute ->
+                    onTimeChange(LocalTime.of(selected.hour, minute).format(timeFormatter))
+                },
             )
         }
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            TextButton(onClick = { onTimeChange(adjustTimeInput(time, -15)) }) { Text("−15 мин") }
+        Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             FilledTonalButton(onClick = { onTimeChange(currentTime()) }) { Text("Сейчас") }
-            TextButton(onClick = { onTimeChange(adjustTimeInput(time, 15)) }) { Text("+15 мин") }
         }
-        if (!valid) {
-            Text("Введите часы 0–23 и минуты 0–59", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NumberWheel(
+    values: IntRange,
+    selectedValue: Int,
+    contentDescription: String,
+    onValueSelected: (Int) -> Unit,
+) {
+    val valueCount = values.count()
+    val middle = 5_000
+    val initialIndex = remember {
+        middle - middle % valueCount + (selectedValue - values.first).coerceIn(0, valueCount - 1)
+    }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
+    val viewportCenter = (listState.layoutInfo.viewportStartOffset + listState.layoutInfo.viewportEndOffset) / 2
+    val selectedIndex = listState.layoutInfo.visibleItemsInfo.minByOrNull { item ->
+        abs(item.offset + item.size / 2 - viewportCenter)
+    }?.index ?: listState.firstVisibleItemIndex
+
+    LaunchedEffect(listState.isScrollInProgress, selectedIndex) {
+        if (!listState.isScrollInProgress) {
+            onValueSelected(values.first + Math.floorMod(selectedIndex, valueCount))
         }
+    }
+    LaunchedEffect(selectedValue) {
+        val currentValue = values.first + Math.floorMod(selectedIndex, valueCount)
+        if (currentValue != selectedValue) {
+            val base = selectedIndex - Math.floorMod(selectedIndex, valueCount)
+            val offset = (selectedValue - values.first).coerceIn(0, valueCount - 1)
+            val target = listOf(base + offset, base - valueCount + offset, base + valueCount + offset)
+                .filter { it >= 0 }
+                .minBy { abs(it - selectedIndex) }
+            listState.scrollToItem(target)
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .width(92.dp)
+                .height(144.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
+            LazyColumn(
+                state = listState,
+                flingBehavior = flingBehavior,
+                contentPadding = PaddingValues(vertical = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                items(count = 10_000) { index ->
+                    val value = values.first + index % valueCount
+                    val isSelected = index == selectedIndex
+                    Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "%02d".format(Locale.US, value),
+                            style = if (isSelected) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        Text(contentDescription, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -324,3 +440,6 @@ internal fun adjustTimeInput(value: String, minutes: Long): String {
     val base = normalized?.let { LocalTime.parse(it, timeFormatter) } ?: LocalTime.now()
     return base.plusMinutes(minutes).format(timeFormatter)
 }
+
+internal fun normalizeMilkAmount(value: Float): Float =
+    ((value / 5f).roundToInt() * 5f).coerceIn(5f, 300f)
