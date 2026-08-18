@@ -14,6 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Rasti"
+rootProject.name = "Anyuta"
 include(":app")
-

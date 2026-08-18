@@ -124,7 +124,7 @@ class GitHubSync {
 
     private fun putContent(config: GitHubConfig, path: String, raw: String, sha: String?) {
         val body = JSONObject()
-            .put("message", "Расти: обновление $path")
+            .put("message", "Анюта: обновление $path")
             .put("content", Base64.encodeToString(raw.toByteArray(), Base64.NO_WRAP))
             .put("branch", config.branch)
             .apply { sha?.let { put("sha", it) } }
@@ -150,7 +150,7 @@ class GitHubSync {
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.setRequestProperty("Authorization", "Bearer ${config.token}")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            connection.setRequestProperty("User-Agent", "Rasti-Android")
+            connection.setRequestProperty("User-Agent", "Anyuta-Android")
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")

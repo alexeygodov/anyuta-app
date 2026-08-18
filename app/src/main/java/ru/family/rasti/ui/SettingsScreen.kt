@@ -108,7 +108,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(owner, { owner = it }, label = { Text("Владелец: username") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(repo, { repo = it }, label = { Text("Репозиторий: child-tracker-data") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(repo, { repo = it }, label = { Text("Репозиторий: anyuta-data") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(branch, { branch = it }, label = { Text("Ветка") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
                 OutlinedTextField(
                     token,
@@ -165,7 +165,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             Spacer(Modifier.height(4.dp))
             Text(
-                "Расти ${BuildConfig.VERSION_NAME}",
+                "Анюта ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

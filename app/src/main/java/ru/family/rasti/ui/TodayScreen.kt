@@ -62,7 +62,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text("Расти", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text("Анюта", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Text(
                 viewModel.data.profile.name,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -1,4 +1,4 @@
-# Расти
+# Анюта
 
 Небольшое Android-приложение для семейного учёта питания, витаминов, роста и веса ребёнка. Работает без собственного сервера: данные сначала сохраняются на телефоне, а по кнопке синхронизируются с отдельным приватным GitHub-репозиторием.
 
@@ -20,10 +20,10 @@
 
 Рекомендуется использовать два репозитория:
 
-1. `rasti-app` — этот проект, только исходники.
-2. `rasti-data` — приватный репозиторий с семейными данными.
+1. `anyuta-app` — этот проект, только исходники.
+2. `anyuta-data` — приватный репозиторий с семейными данными.
 
-Создайте `rasti-data` как **Private repository** и включите создание `README`. После первой синхронизации структура будет такой:
+Создайте `anyuta-data` как **Private repository** и включите создание `README`. После первой синхронизации структура будет такой:
 
 ```text
 profile.json
@@ -43,7 +43,7 @@ Settings → Developer settings → Personal access tokens → Fine-grained toke
 
 Для token задайте:
 
-- Repository access: только `rasti-data`;
+- Repository access: только `anyuta-data`;
 - Repository permissions → Contents: `Read and write`;
 - разумный срок действия.
 
@@ -51,10 +51,10 @@ Settings → Developer settings → Personal access tokens → Fine-grained toke
 
 ## Получение APK без Android Studio
 
-1. Загрузите исходники в репозиторий `rasti-app`.
+1. Загрузите исходники в репозиторий `anyuta-app`.
 2. Откройте вкладку **Actions**.
 3. Выберите **Build Android APK** → **Run workflow**.
-4. После завершения скачайте artifact `rasti-...` и распакуйте APK.
+4. После завершения скачайте artifact `anyuta-...` и распакуйте APK.
 
 Без настроенной подписи workflow создаёт debug APK. Он устанавливается на телефон, но APK из разных запусков может иметь разные ключи, поэтому для обновлений настройте постоянную release-подпись.
 
@@ -63,23 +63,23 @@ Settings → Developer settings → Personal access tokens → Fine-grained toke
 Сгенерируйте ключ один раз и сохраните резервную копию вне GitHub:
 
 ```powershell
-keytool -genkeypair -v -keystore rasti-release.jks -alias rasti -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkeypair -v -keystore anyuta-release.jks -alias anyuta -keyalg RSA -keysize 2048 -validity 10000
 ```
 
 Получите Base64 и скопируйте его в буфер:
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("rasti-release.jks")) | Set-Clipboard
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("anyuta-release.jks")) | Set-Clipboard
 ```
 
-В `rasti-app → Settings → Secrets and variables → Actions` добавьте:
+В `anyuta-app → Settings → Secrets and variables → Actions` добавьте:
 
 - `SIGNING_KEY_BASE64` — содержимое буфера;
 - `KEYSTORE_PASSWORD`;
-- `KEY_ALIAS` — обычно `rasti`;
+- `KEY_ALIAS` — обычно `anyuta`;
 - `KEY_PASSWORD`.
 
-Следующий workflow соберёт подписанный release APK. Файл `rasti-release.jks` и пароли нельзя коммитить. Если ключ потерять, Android не позволит устанавливать новые версии поверх старой.
+Следующий workflow соберёт подписанный release APK. Файл `anyuta-release.jks` и пароли нельзя коммитить. Если ключ потерять, Android не позволит устанавливать новые версии поверх старой.
 
 ## Локальная сборка
 
