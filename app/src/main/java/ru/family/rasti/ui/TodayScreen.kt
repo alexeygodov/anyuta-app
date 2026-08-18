@@ -267,10 +267,10 @@ private fun QuickActions(
 
 @Composable
 private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
-    val consumed = day.food
+    val milkEntries = day.food
         .filter { it.unit.trim().lowercase() in setOf("мл", "ml") }
         .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
-        .sumOf { it.amount }
+    val consumed = milkEntries.sumOf { it.amount }
     val result = FeedingGuide.calculate(data, date)
     val guide = result.guide
     Card(
@@ -286,6 +286,11 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
                 val progress = (consumed / guide.targetMl).toFloat().coerceIn(0f, 1f)
                 Text("${formatNumber(consumed)} из ≈${guide.targetMl} мл")
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                MilkIntakeChart(guide, milkEntries)
+                Text(
+                    "Цветная полоса — расчётный диапазон за сутки; тёмная линия — накопительно смесь + молоко по времени.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Text(
                     "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
                     style = MaterialTheme.typography.bodySmall,

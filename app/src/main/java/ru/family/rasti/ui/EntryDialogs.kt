@@ -1,7 +1,6 @@
 package ru.family.rasti.ui
 
 import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +11,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
@@ -57,6 +58,7 @@ internal fun FoodEditorDialog(
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
     val amountNumber = amount.replace(',', '.').toDoubleOrNull()
+    val normalizedTime = normalizeTimeInput(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -98,8 +100,9 @@ internal fun FoodEditorDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, name.trim(), amountNumber ?: 0.0, fixedUnit ?: unit.trim(), time) },
-                enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0 && (fixedUnit != null || unit.isNotBlank()),
+                onClick = { onSave(date, name.trim(), amountNumber ?: 0.0, fixedUnit ?: unit.trim(), normalizedTime ?: time) },
+                enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0 &&
+                    (fixedUnit != null || unit.isNotBlank()) && normalizedTime != null,
             ) { Text(if (initial == null) "Добавить" else "Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
@@ -117,10 +120,13 @@ internal fun VitaminEditorDialog(
 ) {
     val stateKey = initial?.id ?: "$fixedName-$initialDate"
     var name by rememberSaveable(stateKey) { mutableStateOf(initial?.name ?: fixedName.orEmpty()) }
-    var dose by rememberSaveable(stateKey) { mutableStateOf(initial?.dose.orEmpty()) }
+    var dose by rememberSaveable(stateKey) {
+        mutableStateOf(initial?.dose ?: if (fixedName == "Витамин D") "2 капли" else "")
+    }
     var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
+    val normalizedTime = normalizeTimeInput(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -149,8 +155,8 @@ internal fun VitaminEditorDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, name.trim(), dose.trim(), time) },
-                enabled = name.isNotBlank(),
+                onClick = { onSave(date, name.trim(), dose.trim(), normalizedTime ?: time) },
+                enabled = name.isNotBlank() && normalizedTime != null,
             ) { Text(if (initial == null) "Отметить" else "Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
@@ -174,6 +180,7 @@ internal fun MeasurementEditorDialog(
     val weightNumber = weight.replace(',', '.').toDoubleOrNull()
     val validHeight = height.isBlank() || (heightNumber != null && heightNumber > 0)
     val validWeight = weight.isBlank() || (weightNumber != null && weightNumber > 0)
+    val normalizedTime = normalizeTimeInput(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -206,8 +213,8 @@ internal fun MeasurementEditorDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, heightNumber, weightNumber, time) },
-                enabled = validHeight && validWeight && (height.isNotBlank() || weight.isNotBlank()),
+                onClick = { onSave(date, heightNumber, weightNumber, normalizedTime ?: time) },
+                enabled = validHeight && validWeight && (height.isNotBlank() || weight.isNotBlank()) && normalizedTime != null,
             ) { Text("Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
@@ -221,9 +228,9 @@ internal fun DateTimePickerRow(
     onDateChange: (LocalDate) -> Unit,
     onTimeChange: (String) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        DatePickerButton(date, onDateChange, Modifier.weight(1.25f))
-        TimePickerButton(time, onTimeChange, Modifier.weight(.85f))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        DatePickerButton(date, onDateChange, Modifier.fillMaxWidth())
+        TimeInput(time, onTimeChange)
     }
 }
 
@@ -257,24 +264,63 @@ internal fun DatePickerButton(
 }
 
 @Composable
-private fun TimePickerButton(time: String, onTimeChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val parsed = runCatching { LocalTime.parse(time, timeFormatter) }.getOrDefault(LocalTime.now())
-    OutlinedButton(
-        onClick = {
-            TimePickerDialog(
-                context,
-                { _, hour, minute -> onTimeChange(LocalTime.of(hour, minute).format(timeFormatter)) },
-                parsed.hour,
-                parsed.minute,
-                true,
-            ).show()
-        },
-        modifier = modifier,
-    ) {
-        Icon(Icons.Outlined.Schedule, contentDescription = null)
-        Text("  $time")
+private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
+    val parts = time.split(":", limit = 2)
+    val hours = parts.getOrElse(0) { "" }
+    val minutes = parts.getOrElse(1) { "" }
+    val valid = normalizeTimeInput(time) != null
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Schedule, contentDescription = null)
+            Text("  Время", style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+        }
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = hours,
+                onValueChange = { value -> onTimeChange("${value.filter(Char::isDigit).take(2)}:$minutes") },
+                label = { Text("Часы") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = !valid,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center),
+                modifier = Modifier.weight(1f),
+            )
+            Text(" : ")
+            OutlinedTextField(
+                value = minutes,
+                onValueChange = { value -> onTimeChange("$hours:${value.filter(Char::isDigit).take(2)}") },
+                label = { Text("Минуты") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = !valid,
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = { onTimeChange(adjustTimeInput(time, -15)) }) { Text("−15 мин") }
+            FilledTonalButton(onClick = { onTimeChange(currentTime()) }) { Text("Сейчас") }
+            TextButton(onClick = { onTimeChange(adjustTimeInput(time, 15)) }) { Text("+15 мин") }
+        }
+        if (!valid) {
+            Text("Введите часы 0–23 и минуты 0–59", color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+        }
     }
 }
 
 private fun currentTime(): String = LocalTime.now().format(timeFormatter)
+
+internal fun normalizeTimeInput(value: String): String? {
+    val parts = value.split(":", limit = 2)
+    if (parts.size != 2) return null
+    val hour = parts[0].toIntOrNull() ?: return null
+    val minute = parts[1].toIntOrNull() ?: return null
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return LocalTime.of(hour, minute).format(timeFormatter)
+}
+
+internal fun adjustTimeInput(value: String, minutes: Long): String {
+    val normalized = normalizeTimeInput(value)
+    val base = normalized?.let { LocalTime.parse(it, timeFormatter) } ?: LocalTime.now()
+    return base.plusMinutes(minutes).format(timeFormatter)
+}
