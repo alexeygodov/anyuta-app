@@ -62,7 +62,7 @@ fun RastiApp(viewModel: RastiViewModel) {
     ) { padding ->
         when (screen) {
             AppScreen.TODAY -> TodayScreen(viewModel, Modifier.padding(padding))
-            AppScreen.HISTORY -> HistoryScreen(viewModel.data, Modifier.padding(padding))
+            AppScreen.HISTORY -> HistoryScreen(viewModel, Modifier.padding(padding))
             AppScreen.CHARTS -> ChartsScreen(viewModel.data, Modifier.padding(padding))
             AppScreen.SETTINGS -> SettingsScreen(viewModel, Modifier.padding(padding))
         }

@@ -10,23 +10,40 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ru.family.rasti.data.AppData
+import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.DayRecord
+import ru.family.rasti.data.FoodEntry
+import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.VitaminEntry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private data class HistoryFoodEdit(val date: LocalDate, val entry: FoodEntry)
+private data class HistoryVitaminEdit(val date: LocalDate, val entry: VitaminEntry)
+private data class HistoryMeasurementEdit(val date: LocalDate, val measurement: Measurement)
+
 @Composable
-fun HistoryScreen(data: AppData, modifier: Modifier = Modifier) {
-    val days = data.days.values.sortedByDescending { it.date }
+fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+    val days = viewModel.data.days.values.sortedByDescending { it.date }
     val weekStart = LocalDate.now().minusDays(6).toString()
     val week = days.filter { it.date >= weekStart && it.date <= LocalDate.now().toString() }
+    var foodEdit by remember { mutableStateOf<HistoryFoodEdit?>(null) }
+    var vitaminEdit by remember { mutableStateOf<HistoryVitaminEdit?>(null) }
+    var measurementEdit by remember { mutableStateOf<HistoryMeasurementEdit?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -35,7 +52,7 @@ fun HistoryScreen(data: AppData, modifier: Modifier = Modifier) {
     ) {
         item {
             Text("История", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("Минимальный отчёт без таблиц и лишней бухгалтерии")
+            Text("Нажмите «Изменить», чтобы исправить запись, дату или время")
         }
         item { WeekReport(week) }
         if (days.isEmpty()) {
@@ -45,8 +62,51 @@ fun HistoryScreen(data: AppData, modifier: Modifier = Modifier) {
                 }
             }
         } else {
-            items(days, key = { it.date }) { day -> HistoryDay(day) }
+            items(days, key = { it.date }) { day ->
+                HistoryDay(
+                    day = day,
+                    onFoodEdit = { foodEdit = HistoryFoodEdit(LocalDate.parse(day.date), it) },
+                    onVitaminEdit = { vitaminEdit = HistoryVitaminEdit(LocalDate.parse(day.date), it) },
+                    onMeasurementEdit = { measurementEdit = HistoryMeasurementEdit(LocalDate.parse(day.date), it) },
+                )
+            }
         }
+    }
+
+    foodEdit?.let { edit ->
+        FoodEditorDialog(
+            title = "Изменить запись",
+            initialDate = edit.date,
+            initial = edit.entry,
+            onDismiss = { foodEdit = null },
+            onSave = { targetDate, name, amount, unit, time ->
+                viewModel.updateFood(edit.date, targetDate, edit.entry, name, amount, unit, time)
+                foodEdit = null
+            },
+        )
+    }
+    vitaminEdit?.let { edit ->
+        VitaminEditorDialog(
+            title = "Изменить витамин",
+            initialDate = edit.date,
+            initial = edit.entry,
+            onDismiss = { vitaminEdit = null },
+            onSave = { targetDate, name, dose, time ->
+                viewModel.updateVitamin(edit.date, targetDate, edit.entry, name, dose, time)
+                vitaminEdit = null
+            },
+        )
+    }
+    measurementEdit?.let { edit ->
+        MeasurementEditorDialog(
+            initialDate = edit.date,
+            initial = edit.measurement,
+            onDismiss = { measurementEdit = null },
+            onSave = { targetDate, height, weight, time ->
+                viewModel.updateMeasurement(edit.date, targetDate, height, weight, time)
+                measurementEdit = null
+            },
+        )
     }
 }
 
@@ -63,9 +123,9 @@ private fun WeekReport(days: List<DayRecord>) {
             Text("Последние 7 дней", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 ReportValue("Заполнено", "${days.size} дн.")
-                ReportValue("Приёмов еды", foodCount.toString())
-                ReportValue("Витаминов", vitaminCount.toString())
-                ReportValue("Измерений", measured.toString())
+                ReportValue("Еда", foodCount.toString())
+                ReportValue("Витамины", vitaminCount.toString())
+                ReportValue("Измерения", measured.toString())
             }
         }
     }
@@ -80,32 +140,63 @@ private fun ReportValue(label: String, value: String) {
 }
 
 @Composable
-private fun HistoryDay(day: DayRecord) {
+private fun HistoryDay(
+    day: DayRecord,
+    onFoodEdit: (FoodEntry) -> Unit,
+    onVitaminEdit: (VitaminEntry) -> Unit,
+    onMeasurementEdit: (Measurement) -> Unit,
+) {
     val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 date?.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale.forLanguageTag("ru"))) ?: day.date,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            val totals = day.food.groupBy { it.unit }.mapValues { (_, items) -> items.sumOf { it.amount } }
-            Text(
-                if (totals.isEmpty()) "Еда: —"
-                else "Еда: " + totals.entries.joinToString(" · ") { "${formatNumber(it.value)} ${it.key}" },
-            )
-            Text("Витамины: ${day.vitamins.joinToString { it.name }.ifBlank { "—" }}")
+            if (day.food.isEmpty() && day.vitamins.isEmpty() && day.measurement == null && day.note.isBlank()) {
+                Text("Нет записей", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            day.food.sortedBy { it.time }.forEach { entry ->
+                EditableHistoryRow(
+                    title = entry.name,
+                    subtitle = "${formatNumber(entry.amount)} ${entry.unit} · ${entry.time}",
+                    onEdit = { onFoodEdit(entry) },
+                )
+            }
+            day.vitamins.sortedBy { it.time }.forEach { entry ->
+                EditableHistoryRow(
+                    title = entry.name,
+                    subtitle = listOf(entry.dose, entry.time).filter { it.isNotBlank() }.joinToString(" · "),
+                    onEdit = { onVitaminEdit(entry) },
+                )
+            }
             day.measurement?.let { measurement ->
-                Text(
-                    listOfNotNull(
-                        measurement.heightCm?.let { "рост ${formatNumber(it)} см" },
-                        measurement.weightKg?.let { "вес ${formatNumber(it)} кг" },
-                    ).joinToString(" · ").ifBlank { "Измерения: —" },
+                EditableHistoryRow(
+                    title = "Рост и вес",
+                    subtitle = listOfNotNull(
+                        measurement.heightCm?.let { "${formatNumber(it)} см" },
+                        measurement.weightKg?.let { "${formatNumber(it)} кг" },
+                        measurement.time.takeIf { it.isNotBlank() },
+                    ).joinToString(" · "),
+                    onEdit = { onMeasurementEdit(measurement) },
                 )
             }
             if (day.note.isNotBlank()) {
+                HorizontalDivider()
                 Text(day.note, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+@Composable
+private fun EditableHistoryRow(title: String, subtitle: String, onEdit: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Medium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        TextButton(onClick = onEdit) { Text("Изменить") }
     }
 }

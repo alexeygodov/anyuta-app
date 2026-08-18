@@ -10,25 +10,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,22 +37,44 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.RastiViewModel
+import ru.family.rasti.data.AppData
 import ru.family.rasti.data.DayRecord
+import ru.family.rasti.data.FoodEntry
+import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.feeding.FeedingGuide
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+private data class FoodEditorState(
+    val originalDate: LocalDate,
+    val entry: FoodEntry? = null,
+    val fixedName: String? = null,
+)
+
+private data class VitaminEditorState(
+    val originalDate: LocalDate,
+    val entry: VitaminEntry? = null,
+    val fixedName: String? = null,
+)
+
+private data class MeasurementEditorState(
+    val originalDate: LocalDate,
+    val measurement: Measurement? = null,
+)
 
 @Composable
 fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var selectedDateRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     val selectedDate = LocalDate.parse(selectedDateRaw)
     val day = viewModel.day(selectedDate)
-    var foodDialog by remember { mutableStateOf(false) }
-    var vitaminDialog by remember { mutableStateOf(false) }
-    var measurementDialog by remember { mutableStateOf(false) }
+    val vitaminD = day.vitamins.firstOrNull(::isVitaminD)
+    var foodEditor by remember { mutableStateOf<FoodEditorState?>(null) }
+    var vitaminEditor by remember { mutableStateOf<VitaminEditorState?>(null) }
+    var measurementEditor by remember { mutableStateOf<MeasurementEditorState?>(null) }
     var note by remember(day.date, day.note) { mutableStateOf(day.note) }
 
     LazyColumn(
@@ -63,10 +84,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     ) {
         item {
             Text("Анюта", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text(
-                viewModel.data.profile.name,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(viewModel.data.profile.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item {
             DateNavigator(
@@ -75,37 +93,48 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 onNext = { selectedDateRaw = selectedDate.plusDays(1).toString() },
             )
         }
-        item { DaySummary(day) }
         item {
-            SectionHeader("Еда и питьё", onAdd = { foodDialog = true })
+            QuickActions(
+                vitaminDTaken = vitaminD != null,
+                onFormula = { foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь") },
+                onMilk = { foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко") },
+                onVitaminD = { vitaminEditor = VitaminEditorState(selectedDate, vitaminD, "Витамин D") },
+                onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
+            )
         }
+        item { MilkProgressCard(viewModel.data, selectedDate, day) }
+        item { DaySummary(day) }
+        item { SectionHeader("Еда и питьё", onAdd = { foodEditor = FoodEditorState(selectedDate) }) }
         if (day.food.isEmpty()) {
             item { EmptyHint("Пока ничего не добавлено") }
         } else {
-            items(day.food.sortedByDescending { it.time }, key = { it.id }) { item ->
+            items(day.food.sortedByDescending { it.time }, key = { it.id }) { entry ->
                 EntryRow(
-                    title = item.name,
-                    subtitle = "${formatNumber(item.amount)} ${item.unit} · ${item.time}",
-                    onDelete = { viewModel.removeFood(selectedDate, item.id) },
+                    title = entry.name,
+                    subtitle = "${formatNumber(entry.amount)} ${entry.unit} · ${entry.time}",
+                    onEdit = { foodEditor = FoodEditorState(selectedDate, entry) },
+                    onDelete = { viewModel.removeFood(selectedDate, entry.id) },
                 )
             }
         }
-        item {
-            SectionHeader("Витамины", onAdd = { vitaminDialog = true })
-        }
+        item { SectionHeader("Витамины", onAdd = { vitaminEditor = VitaminEditorState(selectedDate) }) }
         if (day.vitamins.isEmpty()) {
             item { EmptyHint("Сегодня ещё не отмечены") }
         } else {
-            items(day.vitamins.sortedByDescending { it.time }, key = { it.id }) { item ->
+            items(day.vitamins.sortedByDescending { it.time }, key = { it.id }) { entry ->
                 EntryRow(
-                    title = item.name,
-                    subtitle = listOf(item.dose, item.time).filter { it.isNotBlank() }.joinToString(" · "),
-                    onDelete = { viewModel.removeVitamin(selectedDate, item.id) },
+                    title = entry.name,
+                    subtitle = listOf(entry.dose, entry.time).filter { it.isNotBlank() }.joinToString(" · "),
+                    onEdit = { vitaminEditor = VitaminEditorState(selectedDate, entry) },
+                    onDelete = { viewModel.removeVitamin(selectedDate, entry.id) },
                 )
             }
         }
         item {
-            SectionHeader("Рост и вес", onAdd = { measurementDialog = true })
+            SectionHeader(
+                "Рост и вес",
+                onAdd = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
+            )
             val measurement = day.measurement
             if (measurement == null) {
                 EmptyHint("Измерений за этот день нет")
@@ -115,11 +144,17 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
-                        Modifier.fillMaxWidth().padding(18.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        Modifier.fillMaxWidth().padding(start = 18.dp, top = 14.dp, bottom = 14.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        MetricValue("Рост", measurement.heightCm?.let { "${formatNumber(it)} см" } ?: "—")
-                        MetricValue("Вес", measurement.weightKg?.let { "${formatNumber(it)} кг" } ?: "—")
+                        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            MetricValue("Рост", measurement.heightCm?.let { "${formatNumber(it)} см" } ?: "—")
+                            MetricValue("Вес", measurement.weightKg?.let { "${formatNumber(it)} кг" } ?: "—")
+                            MetricValue("Время", measurement.time.ifBlank { "—" })
+                        }
+                        IconButton(onClick = { measurementEditor = MeasurementEditorState(selectedDate, measurement) }) {
+                            Icon(Icons.Outlined.Edit, "Изменить")
+                        }
                     }
                 }
             }
@@ -135,41 +170,134 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 minLines = 2,
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { viewModel.saveNote(selectedDate, note) },
-                enabled = note != day.note,
-            ) { Text("Сохранить заметку") }
+            OutlinedButton(onClick = { viewModel.saveNote(selectedDate, note) }, enabled = note != day.note) {
+                Text("Сохранить заметку")
+            }
         }
         item { Spacer(Modifier.height(8.dp)) }
     }
 
-    if (foodDialog) {
-        FoodDialog(
-            onDismiss = { foodDialog = false },
-            onSave = { name, amount, unit, time ->
-                viewModel.addFood(selectedDate, name, amount, unit, time)
-                foodDialog = false
+    foodEditor?.let { state ->
+        FoodEditorDialog(
+            title = when {
+                state.entry != null -> "Изменить запись"
+                state.fixedName != null -> state.fixedName
+                else -> "Добавить еду или питьё"
+            },
+            initialDate = state.originalDate,
+            initial = state.entry,
+            fixedName = state.fixedName,
+            fixedUnit = state.fixedName?.let { "мл" },
+            onDismiss = { foodEditor = null },
+            onSave = { targetDate, name, amount, unit, time ->
+                val original = state.entry
+                if (original == null) {
+                    viewModel.addFood(targetDate, name, amount, unit, time)
+                } else {
+                    viewModel.updateFood(state.originalDate, targetDate, original, name, amount, unit, time)
+                }
+                foodEditor = null
             },
         )
     }
-    if (vitaminDialog) {
-        VitaminDialog(
-            onDismiss = { vitaminDialog = false },
-            onSave = { name, dose, time ->
-                viewModel.addVitamin(selectedDate, name, dose, time)
-                vitaminDialog = false
+    vitaminEditor?.let { state ->
+        VitaminEditorDialog(
+            title = if (state.fixedName == "Витамин D") "Витамин D" else if (state.entry == null) "Отметить витамин" else "Изменить витамин",
+            initialDate = state.originalDate,
+            initial = state.entry,
+            fixedName = state.fixedName,
+            onDismiss = { vitaminEditor = null },
+            onSave = { targetDate, name, dose, time ->
+                val original = state.entry
+                if (original == null) {
+                    viewModel.addVitamin(targetDate, name, dose, time)
+                } else {
+                    viewModel.updateVitamin(state.originalDate, targetDate, original, name, dose, time)
+                }
+                vitaminEditor = null
             },
         )
     }
-    if (measurementDialog) {
-        MeasurementDialog(
-            day = day,
-            onDismiss = { measurementDialog = false },
-            onSave = { height, weight ->
-                viewModel.saveMeasurement(selectedDate, height, weight)
-                measurementDialog = false
+    measurementEditor?.let { state ->
+        MeasurementEditorDialog(
+            initialDate = state.originalDate,
+            initial = state.measurement,
+            onDismiss = { measurementEditor = null },
+            onSave = { targetDate, height, weight, time ->
+                if (state.measurement == null) {
+                    viewModel.saveMeasurement(targetDate, height, weight, time)
+                } else {
+                    viewModel.updateMeasurement(state.originalDate, targetDate, height, weight, time)
+                }
+                measurementEditor = null
             },
         )
+    }
+}
+
+@Composable
+private fun QuickActions(
+    vitaminDTaken: Boolean,
+    onFormula: () -> Unit,
+    onMilk: () -> Unit,
+    onVitaminD: () -> Unit,
+    onMeasurement: () -> Unit,
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Быстрый ввод", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onFormula, modifier = Modifier.weight(1f)) { Text("Смесь") }
+                Button(onClick = onMilk, modifier = Modifier.weight(1f)) { Text("Молоко") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FilledTonalButton(
+                    onClick = onVitaminD,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (vitaminDTaken) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+                        contentColor = if (vitaminDTaken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) { Text(if (vitaminDTaken) "Витамин D ✓" else "Витамин D") }
+                OutlinedButton(onClick = onMeasurement, modifier = Modifier.weight(1f)) { Text("Рост / вес") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
+    val consumed = day.food
+        .filter { it.unit.trim().lowercase() in setOf("мл", "ml") }
+        .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
+        .sumOf { it.amount }
+    val result = FeedingGuide.calculate(data, date)
+    val guide = result.guide
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Объём питания", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            if (guide == null) {
+                Text("Учтено: ${formatNumber(consumed)} мл")
+                Text(result.explanation, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                val progress = (consumed / guide.targetMl).toFloat().coerceIn(0f, 1f)
+                Text("${formatNumber(consumed)} из ≈${guide.targetMl} мл")
+                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                "Суммируются смесь и измеренное сцеженное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -202,10 +330,7 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
 @Composable
 private fun DaySummary(day: DayRecord) {
     val totals = day.food.groupBy { it.unit }.mapValues { entry -> entry.value.sumOf { it.amount } }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
             Text("Коротко за день", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
@@ -234,16 +359,17 @@ private fun SectionHeader(title: String, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EntryRow(title: String, subtitle: String, onDelete: () -> Unit) {
+private fun EntryRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+            Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                 Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, "Изменить") }
             IconButton(onClick = onDelete) { Icon(Icons.Outlined.DeleteOutline, "Удалить") }
         }
     }
@@ -258,107 +384,13 @@ private fun EmptyHint(text: String) {
 private fun MetricValue(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, color = MaterialTheme.colorScheme.onPrimaryContainer)
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     }
 }
 
-@Composable
-private fun FoodDialog(onDismiss: () -> Unit, onSave: (String, Double, String, String?) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var unit by remember { mutableStateOf("г") }
-    var time by remember { mutableStateOf("") }
-    val amountNumber = amount.replace(',', '.').toDoubleOrNull()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Добавить еду или питьё") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Что съела") }, singleLine = true)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        amount,
-                        { amount = it },
-                        label = { Text("Количество") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                    )
-                    OutlinedTextField(unit, { unit = it }, label = { Text("г / мл") }, modifier = Modifier.weight(.7f), singleLine = true)
-                }
-                OutlinedTextField(time, { time = it }, label = { Text("Время, например 09:30") }, singleLine = true)
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(name.trim(), amountNumber ?: 0.0, unit.trim(), time) },
-                enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0,
-            ) { Text("Добавить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-    )
-}
-
-@Composable
-private fun VitaminDialog(onDismiss: () -> Unit, onSave: (String, String, String?) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var dose by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Отметить витамин") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Название") }, singleLine = true)
-                OutlinedTextField(dose, { dose = it }, label = { Text("Доза, например 1 капля") }, singleLine = true)
-                OutlinedTextField(time, { time = it }, label = { Text("Время, например 09:30") }, singleLine = true)
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onSave(name.trim(), dose.trim(), time) }, enabled = name.isNotBlank()) {
-                Text("Отметить")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-    )
-}
-
-@Composable
-private fun MeasurementDialog(day: DayRecord, onDismiss: () -> Unit, onSave: (Double?, Double?) -> Unit) {
-    var height by remember { mutableStateOf(day.measurement?.heightCm?.let(::formatNumber).orEmpty()) }
-    var weight by remember { mutableStateOf(day.measurement?.weightKg?.let(::formatNumber).orEmpty()) }
-    val heightNumber = height.replace(',', '.').toDoubleOrNull()
-    val weightNumber = weight.replace(',', '.').toDoubleOrNull()
-    val valid = (height.isBlank() || heightNumber != null) && (weight.isBlank() || weightNumber != null)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Рост и вес") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    height,
-                    { height = it },
-                    label = { Text("Рост, см") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    weight,
-                    { weight = it },
-                    label = { Text("Вес, кг") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(heightNumber, weightNumber) },
-                enabled = valid,
-            ) { Text("Сохранить") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
-    )
+private fun isVitaminD(entry: VitaminEntry): Boolean {
+    val normalized = entry.name.lowercase().replace("ё", "е")
+    return normalized.contains("витамин d") || normalized.contains("витамин д") || normalized.contains("d3")
 }
 
 internal fun formatNumber(number: Double): String =

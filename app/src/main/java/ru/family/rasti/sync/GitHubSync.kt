@@ -181,6 +181,11 @@ class GitHubSync {
         val firstNewer = first.updatedAt >= second.updatedAt
         val deletedFoodIds = first.deletedFoodIds + second.deletedFoodIds
         val deletedVitaminIds = first.deletedVitaminIds + second.deletedVitaminIds
+        val measurementDeletedAt = listOfNotNull(first.measurementDeletedAt, second.measurementDeletedAt).maxOrNull()
+        val newestMeasurement = newerMeasurement(first.measurement, second.measurement)
+        val visibleMeasurement = newestMeasurement?.takeIf { measurement ->
+            measurementDeletedAt == null || measurement.updatedAt > measurementDeletedAt
+        }
         return DayRecord(
             date = first.date,
             food = mergeById(first.food, second.food, FoodEntry::id, FoodEntry::updatedAt)
@@ -189,7 +194,8 @@ class GitHubSync {
                 .filterNot { it.id in deletedVitaminIds },
             deletedFoodIds = deletedFoodIds,
             deletedVitaminIds = deletedVitaminIds,
-            measurement = newerMeasurement(first.measurement, second.measurement),
+            measurement = visibleMeasurement,
+            measurementDeletedAt = measurementDeletedAt,
             note = if (firstNewer) first.note else second.note,
             updatedAt = maxOf(first.updatedAt, second.updatedAt),
         )

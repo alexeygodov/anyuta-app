@@ -79,11 +79,13 @@ object JsonCodec {
             value.heightCm?.let { put("heightCm", it) }
             value.weightKg?.let { put("weightKg", it) }
         }
+        .put("time", value.time)
         .put("updatedAt", value.updatedAt)
 
     private fun measurementFromJson(json: JSONObject) = Measurement(
         heightCm = json.optDoubleOrNull("heightCm"),
         weightKg = json.optDoubleOrNull("weightKg"),
+        time = json.optString("time"),
         updatedAt = json.optString("updatedAt"),
     )
 
@@ -94,6 +96,7 @@ object JsonCodec {
         .put("deletedFoodIds", JSONArray(day.deletedFoodIds.toList()))
         .put("deletedVitaminIds", JSONArray(day.deletedVitaminIds.toList()))
         .apply { day.measurement?.let { put("measurement", measurementToJson(it)) } }
+        .apply { day.measurementDeletedAt?.let { put("measurementDeletedAt", it) } }
         .put("note", day.note)
         .put("updatedAt", day.updatedAt)
 
@@ -107,6 +110,7 @@ object JsonCodec {
             deletedFoodIds = json.optJSONArray("deletedFoodIds").toStringSet(),
             deletedVitaminIds = json.optJSONArray("deletedVitaminIds").toStringSet(),
             measurement = json.optJSONObject("measurement")?.let(::measurementFromJson),
+            measurementDeletedAt = json.optString("measurementDeletedAt").takeIf { it.isNotBlank() },
             note = json.optString("note"),
             updatedAt = json.optString("updatedAt"),
         )

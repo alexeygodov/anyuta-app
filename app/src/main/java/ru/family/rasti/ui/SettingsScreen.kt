@@ -43,7 +43,9 @@ import java.time.LocalDate
 fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     val currentProfile = viewModel.data.profile
     var childName by remember(currentProfile) { mutableStateOf(currentProfile.name) }
-    var birthDate by remember(currentProfile) { mutableStateOf(currentProfile.birthDate) }
+    var birthDate by remember(currentProfile) {
+        mutableStateOf(runCatching { LocalDate.parse(currentProfile.birthDate) }.getOrDefault(LocalDate.now().minusYears(1)))
+    }
     var sex by remember(currentProfile) { mutableStateOf(currentProfile.sex) }
 
     val currentConfig = viewModel.githubConfig
@@ -52,8 +54,6 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var branch by remember(currentConfig) { mutableStateOf(currentConfig.branch) }
     var token by remember(currentConfig) { mutableStateOf(currentConfig.token) }
 
-    val birthDateValid = runCatching { LocalDate.parse(birthDate) }.getOrNull()
-        ?.let { !it.isAfter(LocalDate.now()) } == true
     val config = GitHubConfig(owner.trim(), repo.trim(), branch.trim(), token.trim())
 
     LazyColumn(
@@ -73,14 +73,12 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                OutlinedTextField(
-                    birthDate,
-                    { birthDate = it },
-                    label = { Text("Дата рождения: ГГГГ-ММ-ДД") },
-                    supportingText = { if (!birthDateValid) Text("Например: 2025-04-23") },
-                    isError = !birthDateValid,
+                Text("Дата рождения", style = MaterialTheme.typography.labelLarge)
+                DatePickerButton(
+                    date = birthDate,
+                    onDateChange = { birthDate = it },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    maximumDate = LocalDate.now(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FilterChip(
@@ -95,8 +93,8 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Button(
-                    onClick = { viewModel.saveProfile(ChildProfile(childName.trim(), birthDate, sex)) },
-                    enabled = childName.isNotBlank() && birthDateValid,
+                    onClick = { viewModel.saveProfile(ChildProfile(childName.trim(), birthDate.toString(), sex)) },
+                    enabled = childName.isNotBlank(),
                 ) { Text("Сохранить профиль") }
             }
         }

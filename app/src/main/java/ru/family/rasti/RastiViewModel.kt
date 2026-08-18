@@ -55,6 +55,49 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         persist()
     }
 
+    fun updateFood(
+        originalDate: LocalDate,
+        targetDate: LocalDate,
+        original: FoodEntry,
+        name: String,
+        amount: Double,
+        unit: String,
+        time: String,
+    ) {
+        val updated = original.copy(
+            time = time,
+            name = name.trim(),
+            amount = amount,
+            unit = unit.trim().ifBlank { "г" },
+            updatedAt = OffsetDateTime.now().toString(),
+        )
+        if (originalDate == targetDate) {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    food = source.food.map { if (it.id == original.id) updated else it },
+                    deletedFoodIds = source.deletedFoodIds - original.id,
+                ),
+            )
+        } else {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    food = source.food.filterNot { it.id == original.id },
+                    deletedFoodIds = source.deletedFoodIds + original.id,
+                ),
+            )
+            val target = day(targetDate)
+            data = data.updateDay(
+                target.copy(
+                    food = target.food.filterNot { it.id == original.id } + updated,
+                    deletedFoodIds = target.deletedFoodIds - original.id,
+                ),
+            )
+        }
+        persist()
+    }
+
     fun removeFood(date: LocalDate, id: String) {
         val day = day(date)
         data = data.updateDay(
@@ -77,6 +120,47 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         persist()
     }
 
+    fun updateVitamin(
+        originalDate: LocalDate,
+        targetDate: LocalDate,
+        original: VitaminEntry,
+        name: String,
+        dose: String,
+        time: String,
+    ) {
+        val updated = original.copy(
+            time = time,
+            name = name.trim(),
+            dose = dose.trim(),
+            updatedAt = OffsetDateTime.now().toString(),
+        )
+        if (originalDate == targetDate) {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    vitamins = source.vitamins.map { if (it.id == original.id) updated else it },
+                    deletedVitaminIds = source.deletedVitaminIds - original.id,
+                ),
+            )
+        } else {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    vitamins = source.vitamins.filterNot { it.id == original.id },
+                    deletedVitaminIds = source.deletedVitaminIds + original.id,
+                ),
+            )
+            val target = day(targetDate)
+            data = data.updateDay(
+                target.copy(
+                    vitamins = target.vitamins.filterNot { it.id == original.id } + updated,
+                    deletedVitaminIds = target.deletedVitaminIds - original.id,
+                ),
+            )
+        }
+        persist()
+    }
+
     fun removeVitamin(date: LocalDate, id: String) {
         val day = day(date)
         data = data.updateDay(
@@ -88,10 +172,50 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         persist()
     }
 
-    fun saveMeasurement(date: LocalDate, heightCm: Double?, weightKg: Double?) {
+    fun saveMeasurement(date: LocalDate, heightCm: Double?, weightKg: Double?, time: String?) {
         val day = day(date)
-        val measurement = if (heightCm == null && weightKg == null) null else Measurement(heightCm, weightKg)
-        data = data.updateDay(day.copy(measurement = measurement))
+        val now = OffsetDateTime.now().toString()
+        val measurement = if (heightCm == null && weightKg == null) {
+            null
+        } else {
+            Measurement(heightCm = heightCm, weightKg = weightKg, time = time?.ifBlank { currentTime() } ?: currentTime(), updatedAt = now)
+        }
+        data = data.updateDay(
+            day.copy(
+                measurement = measurement,
+                measurementDeletedAt = if (measurement == null) now else day.measurementDeletedAt,
+            ),
+        )
+        persist()
+    }
+
+    fun updateMeasurement(
+        originalDate: LocalDate,
+        targetDate: LocalDate,
+        heightCm: Double?,
+        weightKg: Double?,
+        time: String,
+    ) {
+        val now = OffsetDateTime.now().toString()
+        val updated = if (heightCm == null && weightKg == null) {
+            null
+        } else {
+            Measurement(heightCm = heightCm, weightKg = weightKg, time = time, updatedAt = now)
+        }
+        if (originalDate == targetDate) {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    measurement = updated,
+                    measurementDeletedAt = if (updated == null) now else source.measurementDeletedAt,
+                ),
+            )
+        } else {
+            val source = day(originalDate)
+            data = data.updateDay(source.copy(measurement = null, measurementDeletedAt = now))
+            val target = day(targetDate)
+            data = data.updateDay(target.copy(measurement = updated, measurementDeletedAt = target.measurementDeletedAt))
+        }
         persist()
     }
 

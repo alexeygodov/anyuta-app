@@ -33,6 +33,7 @@ data class VitaminEntry(
 data class Measurement(
     val heightCm: Double? = null,
     val weightKg: Double? = null,
+    val time: String = "",
     val updatedAt: String = OffsetDateTime.now().toString(),
 )
 
@@ -43,6 +44,7 @@ data class DayRecord(
     val deletedFoodIds: Set<String> = emptySet(),
     val deletedVitaminIds: Set<String> = emptySet(),
     val measurement: Measurement? = null,
+    val measurementDeletedAt: String? = null,
     val note: String = "",
     val updatedAt: String = OffsetDateTime.now().toString(),
 )
