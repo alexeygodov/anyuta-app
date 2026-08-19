@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 object JsonCodec {
     fun encodeAppData(data: AppData): String = JSONObject()
-        .put("version", 2)
+        .put("version", 3)
         .put("profile", profileToJson(data.profile))
         .put("days", JSONArray(data.days.values.sortedBy { it.date }.map(::dayToJson)))
         .toString(2)
@@ -31,15 +31,17 @@ object JsonCodec {
     private fun profileToJson(profile: ChildProfile) = JSONObject()
         .put("name", profile.name)
         .put("birthDate", profile.birthDate)
+        .put("dueDate", profile.dueDate)
         .put("sex", profile.sex.name.lowercase())
         .put("updatedAt", profile.updatedAt)
 
     private fun profileFromJson(json: JSONObject) = ChildProfile(
         name = json.optString("name", "Малыш"),
         birthDate = json.optString("birthDate", ChildProfile().birthDate),
+        dueDate = json.optString("dueDate"),
         sex = runCatching { ChildSex.valueOf(json.optString("sex", "girl").uppercase()) }
             .getOrDefault(ChildSex.GIRL),
-        updatedAt = json.optString("updatedAt"),
+        updatedAt = json.optString("updatedAt").ifBlank { "1970-01-01T00:00:00Z" },
     )
 
     private fun foodToJson(item: FoodEntry) = JSONObject()

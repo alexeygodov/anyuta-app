@@ -2,6 +2,7 @@ package ru.family.rasti.ui
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -42,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.RastiViewModel
@@ -90,8 +92,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text("Анюта", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text(viewModel.data.profile.name, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(viewModel.data.profile.name, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
         }
         item {
             DateNavigator(
@@ -114,13 +115,15 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             )
         }
         item {
-            QuickActions(
+            MilkProgressCard(
+                data = viewModel.data,
+                date = selectedDate,
+                day = day,
                 onFormula = { foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь") },
                 onMilk = { foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко") },
                 onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
             )
         }
-        item { MilkProgressCard(viewModel.data, selectedDate, day) }
         item { DaySummary(day) }
         item { SectionHeader("Еда и питьё", onAdd = { foodEditor = FoodEditorState(selectedDate) }) }
         if (day.food.isEmpty()) {
@@ -254,24 +257,6 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun QuickActions(
-    onFormula: () -> Unit,
-    onMilk: () -> Unit,
-    onMeasurement: () -> Unit,
-) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Быстрый ввод", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onFormula, modifier = Modifier.weight(1f)) { Text("Смесь") }
-                Button(onClick = onMilk, modifier = Modifier.weight(1f)) { Text("Молоко") }
-            }
-            OutlinedButton(onClick = onMeasurement, modifier = Modifier.fillMaxWidth()) { Text("Рост / вес") }
-        }
-    }
-}
-
-@Composable
 private fun VitaminDReminder(
     vitaminD: VitaminEntry?,
     shouldPulse: Boolean,
@@ -279,36 +264,40 @@ private fun VitaminDReminder(
 ) {
     val pulseTransition = rememberInfiniteTransition(label = "vitamin-d-reminder")
     val pulse by pulseTransition.animateFloat(
-        initialValue = if (shouldPulse) .68f else 1f,
+        initialValue = if (shouldPulse) 0f else 1f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(850), repeatMode = RepeatMode.Reverse),
-        label = "vitamin-d-alpha",
+        animationSpec = infiniteRepeatable(animation = tween(480), repeatMode = RepeatMode.Reverse),
+        label = "vitamin-d-attention",
     )
     val taken = vitaminD != null
     FilledTonalButton(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp)
-            .graphicsLayer { alpha = if (shouldPulse) pulse else 1f },
+            .height(88.dp)
+            .graphicsLayer {
+                alpha = if (shouldPulse) .52f + pulse * .48f else 1f
+                scaleX = if (shouldPulse) .97f + pulse * .05f else 1f
+                scaleY = if (shouldPulse) .97f + pulse * .05f else 1f
+            },
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = if (taken) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = pulse)
+                lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer, pulse * .38f)
             },
-            contentColor = if (taken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
+            contentColor = if (taken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onError,
         ),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                if (taken) "Витамин D принят ✓" else "Витамин D · 2 капли",
+                if (taken) "Витамин D принят ✓" else "ВИТАМИН D НЕ ПРИНЯТ",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 if (taken) listOf(vitaminD.displayDose(), vitaminD.time).filter { it.isNotBlank() }.joinToString(" · ")
-                else "Ещё не принят — нажмите, чтобы отметить",
+                else "НАЖМИТЕ СЕЙЧАС · 2 капли",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -316,16 +305,29 @@ private fun VitaminDReminder(
 }
 
 @Composable
-private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
+private fun MilkProgressCard(
+    data: AppData,
+    date: LocalDate,
+    day: DayRecord,
+    onFormula: () -> Unit,
+    onMilk: () -> Unit,
+    onMeasurement: () -> Unit,
+) {
     val milkEntries = day.food
         .filter { it.unit.trim().lowercase() in setOf("мл", "ml") }
         .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
     val consumed = milkEntries.sumOf { it.amount }
     val result = FeedingGuide.calculate(data, date)
     val guide = result.guide
+    val startColor = MaterialTheme.colorScheme.errorContainer
+    val targetColor = MaterialTheme.colorScheme.primaryContainer
+    val fallbackColor = MaterialTheme.colorScheme.secondaryContainer
+    val progressToMinimum = guide?.let { (consumed / it.minimumMl).toFloat().coerceIn(0f, 1f) }
+    val desiredColor = progressToMinimum?.let { lerp(startColor, targetColor, it) } ?: fallbackColor
+    val cardColor by animateColorAsState(desiredColor, label = "feeding-progress-background")
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        colors = CardDefaults.cardColors(containerColor = cardColor),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Объём питания", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -335,6 +337,10 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
             } else {
                 Text("Учтено: ${formatNumber(consumed)} мл")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
+                Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
             }
             Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(guide, milkEntries)
@@ -366,6 +372,7 @@ private fun MilkProgressCard(data: AppData, date: LocalDate, day: DayRecord) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            OutlinedButton(onClick = onMeasurement, modifier = Modifier.fillMaxWidth()) { Text("Ввести рост / вес") }
         }
     }
 }

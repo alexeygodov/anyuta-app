@@ -25,6 +25,12 @@ class TimeInputTest {
     }
 
     @Test
+    fun normalizeTimeToFiveMinutes_rounds_down_to_wheel_step() {
+        assertEquals("09:05", normalizeTimeToFiveMinutes("09:09"))
+        assertEquals("23:55", normalizeTimeToFiveMinutes("23:59"))
+    }
+
+    @Test
     fun normalizeMilkAmount_uses_five_ml_steps_and_limits() {
         assertEquals(100f, normalizeMilkAmount(102f), 0f)
         assertEquals(105f, normalizeMilkAmount(103f), 0f)

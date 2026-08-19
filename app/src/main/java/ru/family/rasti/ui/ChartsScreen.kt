@@ -77,6 +77,7 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        item { WeeklyFeedingCard(data) }
         item {
             Text("Графики роста", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Text("Коридор −2…+2 SD по стандартам WHO для детей до 5 лет")
@@ -87,6 +88,7 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             GrowthChartCard(data, standards, GrowthMetric.WEIGHT, "Вес", "кг")
         }
+        item { DevelopmentLeapCard(data.profile) }
         item { GrowthVelocityCard(data, standards) }
         item {
             VaccinationTimelineCard(
@@ -146,7 +148,7 @@ private fun GrowthVelocityCard(data: AppData, standards: GrowthStandards) {
     }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Скачки роста", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Скорость роста по измерениям", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
                 "Скорость изменения роста между измерениями, приведённая к 30 дням.",
                 style = MaterialTheme.typography.bodySmall,

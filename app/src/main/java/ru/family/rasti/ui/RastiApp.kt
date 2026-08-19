@@ -38,6 +38,10 @@ fun RastiApp(viewModel: RastiViewModel) {
     val snackbar = remember { SnackbarHostState() }
     val message = viewModel.statusMessage
 
+    LaunchedEffect(screen) {
+        viewModel.syncIfConfigured(showStatus = false)
+    }
+
     LaunchedEffect(message) {
         if (message != null) {
             snackbar.showSnackbar(message)

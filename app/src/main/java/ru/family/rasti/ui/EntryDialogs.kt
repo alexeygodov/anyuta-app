@@ -83,7 +83,7 @@ internal fun FoodEditorDialog(
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
     val amountNumber = if (usesMilkSlider) milkAmount.toDouble() else amount.replace(',', '.').toDoubleOrNull()
-    val normalizedTime = normalizeTimeInput(time)
+    val normalizedTime = normalizeTimeToFiveMinutes(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -175,7 +175,7 @@ internal fun VitaminEditorDialog(
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
     val amountNumber = amount.replace(',', '.').toDoubleOrNull()
-    val normalizedTime = normalizeTimeInput(time)
+    val normalizedTime = normalizeTimeToFiveMinutes(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -240,7 +240,7 @@ internal fun MeasurementEditorDialog(
     val weightNumber = weight.replace(',', '.').toDoubleOrNull()
     val validHeight = height.isBlank() || (heightNumber != null && heightNumber > 0)
     val validWeight = weight.isBlank() || (weightNumber != null && weightNumber > 0)
-    val normalizedTime = normalizeTimeInput(time)
+    val normalizedTime = normalizeTimeToFiveMinutes(time)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -326,7 +326,8 @@ internal fun DatePickerButton(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
-    val selected = normalizeTimeInput(time)?.let { LocalTime.parse(it, timeFormatter) } ?: LocalTime.now()
+    val selected = normalizeTimeToFiveMinutes(time)?.let { LocalTime.parse(it, timeFormatter) }
+        ?: roundedCurrentTime()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Schedule, contentDescription = null)
@@ -338,7 +339,7 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NumberWheel(
-                values = 0..23,
+                values = (0..23).toList(),
                 selectedValue = selected.hour,
                 contentDescription = "Часы",
                 onValueSelected = { hour ->
@@ -347,7 +348,7 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
             )
             Text(" : ", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             NumberWheel(
-                values = 0..59,
+                values = (0..55 step 5).toList(),
                 selectedValue = selected.minute,
                 contentDescription = "Минуты",
                 onValueSelected = { minute ->
@@ -364,15 +365,17 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NumberWheel(
-    values: IntRange,
+    values: List<Int>,
     selectedValue: Int,
     contentDescription: String,
     onValueSelected: (Int) -> Unit,
 ) {
-    val valueCount = values.count()
+    val valueCount = values.size
+    val selectedOffset = values.indexOf(selectedValue).takeIf { it >= 0 }
+        ?: values.indices.minBy { abs(values[it] - selectedValue) }
     val middle = 5_000
     val initialIndex = remember {
-        middle - middle % valueCount + (selectedValue - values.first).coerceIn(0, valueCount - 1)
+        middle - middle % valueCount + selectedOffset
     }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
@@ -383,14 +386,15 @@ private fun NumberWheel(
 
     LaunchedEffect(listState.isScrollInProgress, selectedIndex) {
         if (!listState.isScrollInProgress) {
-            onValueSelected(values.first + Math.floorMod(selectedIndex, valueCount))
+            onValueSelected(values[Math.floorMod(selectedIndex, valueCount)])
         }
     }
     LaunchedEffect(selectedValue) {
-        val currentValue = values.first + Math.floorMod(selectedIndex, valueCount)
+        val currentValue = values[Math.floorMod(selectedIndex, valueCount)]
         if (currentValue != selectedValue) {
             val base = selectedIndex - Math.floorMod(selectedIndex, valueCount)
-            val offset = (selectedValue - values.first).coerceIn(0, valueCount - 1)
+            val offset = values.indexOf(selectedValue).takeIf { it >= 0 }
+                ?: values.indices.minBy { abs(values[it] - selectedValue) }
             val target = listOf(base + offset, base - valueCount + offset, base + valueCount + offset)
                 .filter { it >= 0 }
                 .minBy { abs(it - selectedIndex) }
@@ -420,7 +424,7 @@ private fun NumberWheel(
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(count = 10_000) { index ->
-                    val value = values.first + index % valueCount
+                    val value = values[index % valueCount]
                     val isSelected = index == selectedIndex
                     Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
                         Text(
@@ -437,7 +441,12 @@ private fun NumberWheel(
     }
 }
 
-private fun currentTime(): String = LocalTime.now().format(timeFormatter)
+private fun roundedCurrentTime(): LocalTime {
+    val now = LocalTime.now()
+    return now.withMinute(now.minute / 5 * 5).withSecond(0).withNano(0)
+}
+
+private fun currentTime(): String = roundedCurrentTime().format(timeFormatter)
 
 internal fun normalizeTimeInput(value: String): String? {
     val parts = value.split(":", limit = 2)
@@ -446,6 +455,12 @@ internal fun normalizeTimeInput(value: String): String? {
     val minute = parts[1].toIntOrNull() ?: return null
     if (hour !in 0..23 || minute !in 0..59) return null
     return LocalTime.of(hour, minute).format(timeFormatter)
+}
+
+internal fun normalizeTimeToFiveMinutes(value: String): String? {
+    val normalized = normalizeTimeInput(value) ?: return null
+    val parsed = LocalTime.parse(normalized, timeFormatter)
+    return parsed.withMinute(parsed.minute / 5 * 5).format(timeFormatter)
 }
 
 internal fun adjustTimeInput(value: String, minutes: Long): String {

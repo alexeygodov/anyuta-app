@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.family.rasti.data.AppData
@@ -36,6 +38,17 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         private set
     var statusMessage by mutableStateOf<String?>(null)
         private set
+    private var syncRequested = false
+
+    init {
+        viewModelScope.launch {
+            syncIfConfigured(showStatus = false)
+            while (isActive) {
+                delay(60_000)
+                syncIfConfigured(showStatus = false)
+            }
+        }
+    }
 
     fun day(date: LocalDate): DayRecord = data.day(date)
 
@@ -288,40 +301,65 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         persist()
     }
 
-    fun saveGitHubConfig(config: GitHubConfig) {
+    fun saveGitHubConfig(config: GitHubConfig, showStatus: Boolean = true) {
         githubConfig = config.copy(branch = config.branch.ifBlank { "main" })
         store.saveGitHubConfig(githubConfig)
-        statusMessage = "Настройки GitHub сохранены"
+        if (showStatus) statusMessage = "Настройки GitHub сохранены"
     }
 
-    fun sync(config: GitHubConfig = githubConfig) {
-        if (syncing) return
-        saveGitHubConfig(config)
+    fun sync(config: GitHubConfig = githubConfig, showStatus: Boolean = true) {
+        saveGitHubConfig(config, showStatus = false)
+        if (!hasSyncConfig(githubConfig)) return
+        if (syncing) {
+            syncRequested = true
+            return
+        }
         syncing = true
-        statusMessage = "Синхронизация…"
+        if (showStatus) statusMessage = "Синхронизация…"
         val syncer = GitHubSync()
         val snapshot = data
+        val activeConfig = githubConfig
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { syncer.sync(githubConfig, snapshot) }
+                withContext(Dispatchers.IO) { syncer.sync(activeConfig, snapshot) }
             }.onSuccess { result ->
                 data = syncer.merge(data, result.data)
-                persist()
-                statusMessage = "Готово: получено ${result.downloadedFiles}, отправлено ${result.uploadedFiles}"
+                persist(syncAfter = false)
+                if (showStatus) {
+                    statusMessage = "Готово: получено ${result.downloadedFiles}, отправлено ${result.uploadedFiles}"
+                }
             }.onFailure { error ->
-                statusMessage = error.message ?: "Ошибка синхронизации"
+                if (showStatus) statusMessage = error.message ?: "Ошибка синхронизации"
             }
             syncing = false
+            if (syncRequested) {
+                syncRequested = false
+                sync(githubConfig, showStatus = false)
+            }
         }
+    }
+
+    fun syncIfConfigured(showStatus: Boolean = false) {
+        if (hasSyncConfig(githubConfig)) sync(githubConfig, showStatus)
     }
 
     fun clearStatus() {
         statusMessage = null
     }
 
-    private fun persist() = store.saveData(data)
+    private fun persist(syncAfter: Boolean = true) {
+        store.saveData(data)
+        if (syncAfter) syncIfConfigured(showStatus = false)
+    }
 
-    private fun currentTime(): String = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
+    private fun currentTime(): String {
+        val now = LocalTime.now()
+        return now.withMinute(now.minute / 5 * 5).withSecond(0).withNano(0)
+            .format(DateTimeFormatter.ofPattern("HH:mm"))
+    }
+
+    private fun hasSyncConfig(config: GitHubConfig): Boolean =
+        config.owner.isNotBlank() && config.repo.isNotBlank() && config.token.isNotBlank()
 
     class Factory(private val store: LocalStore) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

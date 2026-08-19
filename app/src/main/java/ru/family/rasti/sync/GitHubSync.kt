@@ -9,6 +9,7 @@ import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.JsonCodec
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.isPlaceholder
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
 import java.io.IOException
@@ -175,8 +176,12 @@ class GitHubSync {
         }
     }
 
-    private fun newerProfile(first: ChildProfile, second: ChildProfile): ChildProfile =
-        if (first.updatedAt >= second.updatedAt) first else second
+    private fun newerProfile(first: ChildProfile, second: ChildProfile): ChildProfile = when {
+        first.isPlaceholder() && !second.isPlaceholder() -> second
+        second.isPlaceholder() && !first.isPlaceholder() -> first
+        first.updatedAt >= second.updatedAt -> first
+        else -> second
+    }
 
     private fun mergeDay(first: DayRecord, second: DayRecord): DayRecord {
         val firstNewer = first.updatedAt >= second.updatedAt

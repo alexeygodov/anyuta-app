@@ -48,6 +48,7 @@ import ru.family.rasti.update.UpdateInfo
 import java.io.File
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -61,6 +62,10 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var birthDate by remember(currentProfile) {
         mutableStateOf(runCatching { LocalDate.parse(currentProfile.birthDate) }.getOrDefault(LocalDate.now().minusYears(1)))
     }
+    var dueDate by remember(currentProfile) {
+        mutableStateOf(runCatching { LocalDate.parse(currentProfile.dueDate) }.getOrDefault(birthDate))
+    }
+    var useBirthDateForLeaps by remember(currentProfile) { mutableStateOf(currentProfile.dueDate.isBlank()) }
     var sex by remember(currentProfile) { mutableStateOf(currentProfile.sex) }
 
     val currentConfig = viewModel.githubConfig
@@ -78,6 +83,16 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     val tokenUrl = "https://github.com/settings/personal-access-tokens/new" +
         "?name=Anyuta-phone&description=Anyuta-data-sync" +
         "&target_name=${Uri.encode(tokenOwner)}&expires_in=366&contents=write"
+
+    androidx.compose.runtime.LaunchedEffect(token) {
+        delay(600)
+        val normalized = token.trim()
+        val looksComplete = (normalized.startsWith("github_pat_") && normalized.length >= 80) ||
+            (normalized.startsWith("ghp_") && normalized.length >= 40)
+        if (looksComplete && normalized != viewModel.githubConfig.token) {
+            viewModel.sync(config, showStatus = true)
+        }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -103,6 +118,19 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     maximumDate = LocalDate.now(),
                 )
+                FilterChip(
+                    selected = useBirthDateForLeaps,
+                    onClick = { useBirthDateForLeaps = !useBirthDateForLeaps },
+                    label = { Text("ПДР неизвестна — считать скачки от рождения") },
+                )
+                if (!useBirthDateForLeaps) {
+                    Text("Предполагаемая дата родов", style = MaterialTheme.typography.labelLarge)
+                    DatePickerButton(
+                        date = dueDate,
+                        onDateChange = { dueDate = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FilterChip(
                         selected = sex == ChildSex.GIRL,
@@ -116,7 +144,16 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Button(
-                    onClick = { viewModel.saveProfile(ChildProfile(childName.trim(), birthDate.toString(), sex)) },
+                    onClick = {
+                        viewModel.saveProfile(
+                            ChildProfile(
+                                name = childName.trim(),
+                                birthDate = birthDate.toString(),
+                                dueDate = if (useBirthDateForLeaps) "" else dueDate.toString(),
+                                sex = sex,
+                            ),
+                        )
+                    },
                     enabled = childName.isNotBlank(),
                 ) { Text("Сохранить профиль") }
             }
@@ -177,6 +214,11 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 }
                 Text(
                     "SSH-ключ, который вы добавляли в аккаунт GitHub, нужен компьютеру для git push. Приложение Android использует токен выше.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "После сохранения синхронизация идёт автоматически: при запуске, каждую минуту, после ввода данных и при переключении вкладок.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

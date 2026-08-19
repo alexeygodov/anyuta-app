@@ -9,9 +9,12 @@ enum class ChildSex { GIRL, BOY }
 data class ChildProfile(
     val name: String = "Малыш",
     val birthDate: String = LocalDate.now().minusYears(1).toString(),
+    val dueDate: String = "",
     val sex: ChildSex = ChildSex.GIRL,
-    val updatedAt: String = OffsetDateTime.now().toString(),
+    val updatedAt: String = "1970-01-01T00:00:00Z",
 )
+
+fun ChildProfile.isPlaceholder(): Boolean = name.trim().equals("Малыш", ignoreCase = true)
 
 data class FoodEntry(
     val id: String = UUID.randomUUID().toString(),

@@ -5,12 +5,24 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import ru.family.rasti.data.AppData
+import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VaccinationEntry
 
 class GitHubSyncTest {
+    @Test
+    fun merge_prefers_real_remote_profile_over_newer_placeholder() {
+        val placeholder = ChildProfile(name = "Малыш", updatedAt = "2026-08-19T12:37:00Z")
+        val real = ChildProfile(name = "Аня", birthDate = "2026-05-10", updatedAt = "2026-08-18T23:00:00Z")
+
+        val merged = GitHubSync().merge(AppData(profile = placeholder), AppData(profile = real))
+
+        assertEquals("Аня", merged.profile.name)
+        assertEquals("2026-05-10", merged.profile.birthDate)
+    }
+
     @Test
     fun merge_keeps_entries_from_both_devices() {
         val first = FoodEntry("first", "08:00", "Каша", 100.0, "г", "2026-08-18T08:00:00Z")
