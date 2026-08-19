@@ -26,7 +26,18 @@ data class VitaminEntry(
     val id: String = UUID.randomUUID().toString(),
     val time: String,
     val name: String,
-    val dose: String,
+    val amount: Double,
+    val unit: String,
+    val updatedAt: String = OffsetDateTime.now().toString(),
+)
+
+enum class VaccinationStatus { PLANNED, COMPLETED }
+
+data class VaccinationEntry(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val status: VaccinationStatus = VaccinationStatus.PLANNED,
+    val note: String = "",
     val updatedAt: String = OffsetDateTime.now().toString(),
 )
 
@@ -41,8 +52,10 @@ data class DayRecord(
     val date: String,
     val food: List<FoodEntry> = emptyList(),
     val vitamins: List<VitaminEntry> = emptyList(),
+    val vaccinations: List<VaccinationEntry> = emptyList(),
     val deletedFoodIds: Set<String> = emptySet(),
     val deletedVitaminIds: Set<String> = emptySet(),
+    val deletedVaccinationIds: Set<String> = emptySet(),
     val measurement: Measurement? = null,
     val measurementDeletedAt: String? = null,
     val note: String = "",
@@ -66,3 +79,36 @@ fun AppData.day(date: LocalDate): DayRecord =
 
 fun AppData.updateDay(day: DayRecord): AppData =
     copy(days = days + (day.date to day.copy(updatedAt = OffsetDateTime.now().toString())))
+
+fun formatVitaminDose(amount: Double, unit: String): String {
+    val number = if (amount % 1.0 == 0.0) amount.toInt().toString() else amount.toString().replace('.', ',')
+    val normalizedUnit = unit.trim().lowercase()
+    if (normalizedUnit != "капля") return "$number ${unit.trim()}".trim()
+    val integer = amount.toInt()
+    val word = if (amount % 1.0 != 0.0) {
+        "капли"
+    } else if (integer % 100 in 11..14) {
+        "капель"
+    } else {
+        when (integer % 10) {
+            1 -> "капля"
+            in 2..4 -> "капли"
+            else -> "капель"
+        }
+    }
+    return "$number $word"
+}
+
+fun VitaminEntry.displayDose(): String = formatVitaminDose(amount, unit)
+
+internal fun parseLegacyVitaminDose(value: String): Pair<Double, String> {
+    val numberPattern = Regex("[-+]?\\d+(?:[.,]\\d+)?")
+    val amount = numberPattern.find(value)?.value?.replace(',', '.')?.toDoubleOrNull() ?: 0.0
+    val unit = normalizeVitaminUnit(value.replace(numberPattern, "").trim())
+    return amount to unit
+}
+
+internal fun normalizeVitaminUnit(value: String): String = when (value.trim().lowercase()) {
+    "капля", "капли", "капель" -> "капля"
+    else -> value.trim().ifBlank { "ед." }
+}

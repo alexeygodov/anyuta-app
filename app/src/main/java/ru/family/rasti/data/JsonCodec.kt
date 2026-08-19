@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 object JsonCodec {
     fun encodeAppData(data: AppData): String = JSONObject()
-        .put("version", 1)
+        .put("version", 2)
         .put("profile", profileToJson(data.profile))
         .put("days", JSONArray(data.days.values.sortedBy { it.date }.map(::dayToJson)))
         .toString(2)
@@ -63,14 +63,37 @@ object JsonCodec {
         .put("id", item.id)
         .put("time", item.time)
         .put("name", item.name)
-        .put("dose", item.dose)
+        .put("amount", item.amount)
+        .put("unit", item.unit)
+        .put("dose", formatVitaminDose(item.amount, item.unit))
         .put("updatedAt", item.updatedAt)
 
-    private fun vitaminFromJson(json: JSONObject) = VitaminEntry(
+    private fun vitaminFromJson(json: JSONObject): VitaminEntry {
+        val legacyDose = json.optString("dose")
+        val (legacyAmount, legacyUnit) = parseLegacyVitaminDose(legacyDose)
+        return VitaminEntry(
+            id = json.getString("id"),
+            time = json.optString("time"),
+            name = json.optString("name"),
+            amount = json.optDoubleOrNull("amount") ?: legacyAmount,
+            unit = normalizeVitaminUnit(json.optString("unit").ifBlank { legacyUnit }),
+            updatedAt = json.optString("updatedAt"),
+        )
+    }
+
+    private fun vaccinationToJson(item: VaccinationEntry) = JSONObject()
+        .put("id", item.id)
+        .put("name", item.name)
+        .put("status", item.status.name.lowercase())
+        .put("note", item.note)
+        .put("updatedAt", item.updatedAt)
+
+    private fun vaccinationFromJson(json: JSONObject) = VaccinationEntry(
         id = json.getString("id"),
-        time = json.optString("time"),
         name = json.optString("name"),
-        dose = json.optString("dose"),
+        status = runCatching { VaccinationStatus.valueOf(json.optString("status", "planned").uppercase()) }
+            .getOrDefault(VaccinationStatus.PLANNED),
+        note = json.optString("note"),
         updatedAt = json.optString("updatedAt"),
     )
 
@@ -93,8 +116,10 @@ object JsonCodec {
         .put("date", day.date)
         .put("food", JSONArray(day.food.map(::foodToJson)))
         .put("vitamins", JSONArray(day.vitamins.map(::vitaminToJson)))
+        .put("vaccinations", JSONArray(day.vaccinations.map(::vaccinationToJson)))
         .put("deletedFoodIds", JSONArray(day.deletedFoodIds.toList()))
         .put("deletedVitaminIds", JSONArray(day.deletedVitaminIds.toList()))
+        .put("deletedVaccinationIds", JSONArray(day.deletedVaccinationIds.toList()))
         .apply { day.measurement?.let { put("measurement", measurementToJson(it)) } }
         .apply { day.measurementDeletedAt?.let { put("measurementDeletedAt", it) } }
         .put("note", day.note)
@@ -103,12 +128,15 @@ object JsonCodec {
     private fun dayFromJson(json: JSONObject): DayRecord {
         val foodArray = json.optJSONArray("food") ?: JSONArray()
         val vitaminArray = json.optJSONArray("vitamins") ?: JSONArray()
+        val vaccinationArray = json.optJSONArray("vaccinations") ?: JSONArray()
         return DayRecord(
             date = json.getString("date"),
             food = List(foodArray.length()) { foodFromJson(foodArray.getJSONObject(it)) },
             vitamins = List(vitaminArray.length()) { vitaminFromJson(vitaminArray.getJSONObject(it)) },
+            vaccinations = List(vaccinationArray.length()) { vaccinationFromJson(vaccinationArray.getJSONObject(it)) },
             deletedFoodIds = json.optJSONArray("deletedFoodIds").toStringSet(),
             deletedVitaminIds = json.optJSONArray("deletedVitaminIds").toStringSet(),
+            deletedVaccinationIds = json.optJSONArray("deletedVaccinationIds").toStringSet(),
             measurement = json.optJSONObject("measurement")?.let(::measurementFromJson),
             measurementDeletedAt = json.optString("measurementDeletedAt").takeIf { it.isNotBlank() },
             note = json.optString("note"),
@@ -124,4 +152,5 @@ object JsonCodec {
             for (index in 0 until length()) add(getString(index))
         }
     }
+
 }

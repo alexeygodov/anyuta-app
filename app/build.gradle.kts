@@ -20,8 +20,8 @@ android {
         applicationId = "ru.family.rasti"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.3.2"
+        versionCode = 6
+        versionName = "0.4.0"
     }
 
     if (keystorePropertiesFile.exists()) {
@@ -69,6 +69,7 @@ dependencies {
     androidTestImplementation(composeBom)
 
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")

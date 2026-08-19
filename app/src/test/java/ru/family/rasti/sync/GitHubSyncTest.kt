@@ -8,6 +8,7 @@ import ru.family.rasti.data.AppData
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.VaccinationEntry
 
 class GitHubSyncTest {
     @Test
@@ -55,5 +56,20 @@ class GitHubSyncTest {
 
         assertNull(merged.measurement)
         assertEquals("2026-08-18T10:00:00Z", merged.measurementDeletedAt)
+    }
+
+    @Test
+    fun merge_does_not_resurrect_deleted_vaccination() {
+        val vaccination = VaccinationEntry(id = "vaccine", name = "Пентаксим")
+        val localDay = DayRecord("2026-08-18", deletedVaccinationIds = setOf("vaccine"))
+        val remoteDay = DayRecord("2026-08-18", vaccinations = listOf(vaccination))
+
+        val merged = GitHubSync().merge(
+            AppData(days = mapOf(localDay.date to localDay)),
+            AppData(days = mapOf(remoteDay.date to remoteDay)),
+        ).days.getValue("2026-08-18")
+
+        assertTrue(merged.vaccinations.isEmpty())
+        assertTrue("vaccine" in merged.deletedVaccinationIds)
     }
 }

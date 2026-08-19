@@ -29,10 +29,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -41,11 +43,19 @@ import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.ChildSex
 import ru.family.rasti.data.GitHubConfig
+import ru.family.rasti.update.AppUpdater
+import ru.family.rasti.update.UpdateInfo
+import java.io.File
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val currentProfile = viewModel.data.profile
     var childName by remember(currentProfile) { mutableStateOf(currentProfile.name) }
     var birthDate by remember(currentProfile) {
@@ -58,6 +68,10 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var repo by remember(currentConfig) { mutableStateOf(currentConfig.repo) }
     var branch by remember(currentConfig) { mutableStateOf(currentConfig.branch) }
     var token by remember(currentConfig) { mutableStateOf(currentConfig.token) }
+    var availableUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
+    var updateBusy by remember { mutableStateOf(false) }
+    var updateMessage by remember { mutableStateOf("Можно проверить новую версию в GitHub Releases.") }
+    var downloadedApkPath by remember { mutableStateOf<String?>(null) }
 
     val config = GitHubConfig(owner.trim(), repo.trim(), branch.trim(), token.trim())
     val tokenOwner = owner.trim().ifBlank { "alexeygodov" }
@@ -111,7 +125,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             SettingsCard("Синхронизация через GitHub") {
                 Text(
                     "Здесь нужен не SSH-ключ и не пароль, а отдельный fine-grained personal access token. " +
-                        "Он разрешит приложению читать и записывать только данные в anyuta-data.",
+                        "Он используется для данных и скачивания приватных обновлений.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedButton(
@@ -122,7 +136,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     Text("  Создать токен на GitHub")
                 }
                 Text(
-                    "На открывшейся странице выберите Repository access → Only select repositories → anyuta-data. " +
+                    "На открывшейся странице выберите Repository access → Only select repositories → anyuta-data и anyuta-app. " +
                         "Для Contents оставьте Read and write, нажмите Generate token и сразу скопируйте результат.",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -165,6 +179,75 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     "SSH-ключ, который вы добавляли в аккаунт GitHub, нужен компьютеру для git push. Приложение Android использует токен выше.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            SettingsCard("Обновление приложения") {
+                Text("Установлена версия ${BuildConfig.VERSION_NAME}")
+                Text(updateMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(
+                    onClick = {
+                        val update = availableUpdate
+                        scope.launch {
+                            updateBusy = true
+                            if (update == null) {
+                                runCatching {
+                                    withContext(Dispatchers.IO) { AppUpdater.check(BuildConfig.VERSION_NAME, token.trim()) }
+                                }.onSuccess { result ->
+                                    availableUpdate = result
+                                    updateMessage = if (result == null) {
+                                        "У вас последняя опубликованная версия."
+                                    } else {
+                                        "Доступна версия ${result.versionName}."
+                                    }
+                                }.onFailure { error ->
+                                    updateMessage = error.message ?: "Не удалось проверить обновление"
+                                }
+                            } else {
+                                runCatching {
+                                    val cached = downloadedApkPath?.let(::File)?.takeIf(File::exists)
+                                    cached ?: withContext(Dispatchers.IO) { AppUpdater.download(context, update, token.trim()) }
+                                }.onSuccess { apk ->
+                                    downloadedApkPath = apk.absolutePath
+                                    val installerOpened = runCatching { AppUpdater.requestInstall(context, apk) }.getOrElse { error ->
+                                        updateMessage = error.message ?: "Не удалось открыть установку"
+                                        false
+                                    }
+                                    if (installerOpened) {
+                                        updateMessage = "APK скачан. Подтвердите обновление в окне Android."
+                                    } else if (!updateMessage.startsWith("Не удалось")) {
+                                        updateMessage = "Разрешите установку из этого источника и нажмите кнопку ещё раз."
+                                    }
+                                }.onFailure { error ->
+                                    updateMessage = error.message ?: "Не удалось скачать обновление"
+                                }
+                            }
+                            updateBusy = false
+                        }
+                    },
+                    enabled = !updateBusy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (updateBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary,
+                        )
+                    }
+                    Text(
+                        when {
+                            updateBusy -> "  Подождите…"
+                            availableUpdate == null -> "Проверить обновление"
+                            else -> "Скачать и установить ${availableUpdate?.versionName}"
+                        },
+                    )
+                }
+                Text(
+                    "Для приватного anyuta-app токен выше должен иметь доступ к anyuta-app и anyuta-data. " +
+                        "Android один раз попросит разрешить установку из приложения «Анюта».",
+                    style = MaterialTheme.typography.bodySmall,
                 )
             }
         }

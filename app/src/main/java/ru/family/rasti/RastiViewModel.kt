@@ -17,6 +17,8 @@ import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.LocalStore
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.data.VaccinationEntry
+import ru.family.rasti.data.VaccinationStatus
 import ru.family.rasti.data.day
 import ru.family.rasti.data.updateDay
 import ru.family.rasti.sync.GitHubSync
@@ -109,12 +111,13 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         persist()
     }
 
-    fun addVitamin(date: LocalDate, name: String, dose: String, time: String?) {
+    fun addVitamin(date: LocalDate, name: String, amount: Double, unit: String, time: String?) {
         val day = day(date)
         val entry = VitaminEntry(
             time = time?.takeIf { it.isNotBlank() } ?: currentTime(),
             name = name.trim(),
-            dose = dose.trim(),
+            amount = amount,
+            unit = unit.trim(),
         )
         data = data.updateDay(day.copy(vitamins = day.vitamins + entry))
         persist()
@@ -125,13 +128,15 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         targetDate: LocalDate,
         original: VitaminEntry,
         name: String,
-        dose: String,
+        amount: Double,
+        unit: String,
         time: String,
     ) {
         val updated = original.copy(
             time = time,
             name = name.trim(),
-            dose = dose.trim(),
+            amount = amount,
+            unit = unit.trim(),
             updatedAt = OffsetDateTime.now().toString(),
         )
         if (originalDate == targetDate) {
@@ -167,6 +172,65 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
             day.copy(
                 vitamins = day.vitamins.filterNot { it.id == id },
                 deletedVitaminIds = day.deletedVitaminIds + id,
+            ),
+        )
+        persist()
+    }
+
+    fun addVaccination(date: LocalDate, name: String, status: VaccinationStatus, note: String) {
+        val day = day(date)
+        val entry = VaccinationEntry(name = name.trim(), status = status, note = note.trim())
+        data = data.updateDay(day.copy(vaccinations = day.vaccinations + entry))
+        persist()
+    }
+
+    fun updateVaccination(
+        originalDate: LocalDate,
+        targetDate: LocalDate,
+        original: VaccinationEntry,
+        name: String,
+        status: VaccinationStatus,
+        note: String,
+    ) {
+        val updated = original.copy(
+            name = name.trim(),
+            status = status,
+            note = note.trim(),
+            updatedAt = OffsetDateTime.now().toString(),
+        )
+        if (originalDate == targetDate) {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    vaccinations = source.vaccinations.map { if (it.id == original.id) updated else it },
+                    deletedVaccinationIds = source.deletedVaccinationIds - original.id,
+                ),
+            )
+        } else {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    vaccinations = source.vaccinations.filterNot { it.id == original.id },
+                    deletedVaccinationIds = source.deletedVaccinationIds + original.id,
+                ),
+            )
+            val target = day(targetDate)
+            data = data.updateDay(
+                target.copy(
+                    vaccinations = target.vaccinations.filterNot { it.id == original.id } + updated,
+                    deletedVaccinationIds = target.deletedVaccinationIds - original.id,
+                ),
+            )
+        }
+        persist()
+    }
+
+    fun removeVaccination(date: LocalDate, id: String) {
+        val day = day(date)
+        data = data.updateDay(
+            day.copy(
+                vaccinations = day.vaccinations.filterNot { it.id == id },
+                deletedVaccinationIds = day.deletedVaccinationIds + id,
             ),
         )
         persist()

@@ -163,16 +163,18 @@ internal fun VitaminEditorDialog(
     initial: VitaminEntry? = null,
     fixedName: String? = null,
     onDismiss: () -> Unit,
-    onSave: (LocalDate, String, String, String) -> Unit,
+    onSave: (LocalDate, String, Double, String, String) -> Unit,
 ) {
     val stateKey = initial?.id ?: "$fixedName-$initialDate"
     var name by rememberSaveable(stateKey) { mutableStateOf(initial?.name ?: fixedName.orEmpty()) }
-    var dose by rememberSaveable(stateKey) {
-        mutableStateOf(initial?.dose ?: if (fixedName == "Витамин D") "2 капли" else "")
+    var amount by rememberSaveable(stateKey) {
+        mutableStateOf(initial?.amount?.let(::formatNumber) ?: if (fixedName == "Витамин D") "2" else "")
     }
+    var unit by rememberSaveable(stateKey) { mutableStateOf(initial?.unit ?: if (fixedName == "Витамин D") "капля" else "ед.") }
     var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
     val date = LocalDate.parse(dateRaw)
+    val amountNumber = amount.replace(',', '.').toDoubleOrNull()
     val normalizedTime = normalizeTimeInput(time)
 
     AlertDialog(
@@ -185,13 +187,24 @@ internal fun VitaminEditorDialog(
                 } else {
                     Text(fixedName)
                 }
-                OutlinedTextField(
-                    dose,
-                    { dose = it },
-                    label = { Text("Доза, например 1 капля") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        amount,
+                        { value -> amount = value.filter { it.isDigit() || it == ',' || it == '.' } },
+                        label = { Text("Количество") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        unit,
+                        { unit = it },
+                        label = { Text("Единица") },
+                        supportingText = { if (fixedName == "Витамин D") Text("например, капля") },
+                        modifier = Modifier.weight(1.15f),
+                        singleLine = true,
+                    )
+                }
                 DateTimePickerRow(
                     date = date,
                     time = time,
@@ -202,8 +215,8 @@ internal fun VitaminEditorDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, name.trim(), dose.trim(), normalizedTime ?: time) },
-                enabled = name.isNotBlank() && normalizedTime != null,
+                onClick = { onSave(date, name.trim(), amountNumber ?: 0.0, unit.trim(), normalizedTime ?: time) },
+                enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0.0 && unit.isNotBlank() && normalizedTime != null,
             ) { Text(if (initial == null) "Отметить" else "Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },

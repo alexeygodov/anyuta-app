@@ -4,16 +4,29 @@ import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -26,22 +39,38 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.AppData
+import ru.family.rasti.data.VaccinationEntry
+import ru.family.rasti.data.VaccinationStatus
 import ru.family.rasti.growth.GrowthBand
 import ru.family.rasti.growth.GrowthMetric
 import ru.family.rasti.growth.GrowthStandards
 import java.util.Locale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
 private data class ChartPoint(val day: Int, val value: Float)
+private data class VaccinationEdit(val date: LocalDate, val entry: VaccinationEntry? = null)
+private data class HeightVelocityPoint(
+    val endDay: Int,
+    val changeCm: Float,
+    val intervalDays: Long,
+    val cmPerThirtyDays: Float,
+)
 
 @Composable
-fun ChartsScreen(data: AppData, modifier: Modifier = Modifier) {
+fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+    val data = viewModel.data
     val context = LocalContext.current
     val standards = remember(context) { GrowthStandards(context) }
+    var vaccinationEdit by remember { mutableStateOf<VaccinationEdit?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -58,6 +87,15 @@ fun ChartsScreen(data: AppData, modifier: Modifier = Modifier) {
         item {
             GrowthChartCard(data, standards, GrowthMetric.WEIGHT, "Вес", "кг")
         }
+        item { GrowthVelocityCard(data, standards) }
+        item {
+            VaccinationTimelineCard(
+                data = data,
+                onAdd = { vaccinationEdit = VaccinationEdit(LocalDate.now()) },
+                onEdit = { date, entry -> vaccinationEdit = VaccinationEdit(date, entry) },
+                onDelete = viewModel::removeVaccination,
+            )
+        }
         item {
             Text(
                 "Справочные границы помогают видеть динамику, но не заменяют оценку педиатра. " +
@@ -66,6 +104,192 @@ fun ChartsScreen(data: AppData, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+
+    vaccinationEdit?.let { edit ->
+        VaccinationEditorDialog(
+            initialDate = edit.date,
+            initial = edit.entry,
+            onDismiss = { vaccinationEdit = null },
+            onSave = { date, name, status, note ->
+                if (edit.entry == null) {
+                    viewModel.addVaccination(date, name, status, note)
+                } else {
+                    viewModel.updateVaccination(edit.date, date, edit.entry, name, status, note)
+                }
+                vaccinationEdit = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun GrowthVelocityCard(data: AppData, standards: GrowthStandards) {
+    val points = remember(data.days, data.profile.birthDate) {
+        val measurements = data.days.values.mapNotNull { day ->
+            val date = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@mapNotNull null
+            val age = standards.ageInDays(data.profile.birthDate, day.date) ?: return@mapNotNull null
+            val height = day.measurement?.heightCm ?: return@mapNotNull null
+            Triple(date, age, height.toFloat())
+        }.sortedBy { it.first }
+        measurements.zipWithNext().mapNotNull { (first, second) ->
+            val days = ChronoUnit.DAYS.between(first.first, second.first)
+            if (days <= 0) return@mapNotNull null
+            val change = second.third - first.third
+            HeightVelocityPoint(
+                endDay = second.second,
+                changeCm = change,
+                intervalDays = days,
+                cmPerThirtyDays = change / days * 30f,
+            )
+        }
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Скачки роста", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(
+                "Скорость изменения роста между измерениями, приведённая к 30 дням.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (points.isEmpty()) {
+                Text("Добавьте рост минимум в две разные даты.")
+            } else {
+                HeightVelocityCanvas(points.takeLast(10))
+                val last = points.last()
+                val sign = if (last.changeCm >= 0f) "+" else ""
+                Text(
+                    "Последний интервал: $sign${formatFloat(last.changeCm)} см за ${last.intervalDays} дн. " +
+                        "(≈${formatFloat(last.cmPerThirtyDays)} см/30 дней)",
+                )
+                Text(
+                    "Небольшие перепады и отрицательные значения возможны из-за разницы техники измерения.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeightVelocityCanvas(points: List<HeightVelocityPoint>) {
+    val positiveColor = MaterialTheme.colorScheme.primary
+    val negativeColor = MaterialTheme.colorScheme.error
+    val outline = MaterialTheme.colorScheme.outline
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(Modifier.fillMaxWidth().height(210.dp)) {
+        val left = 52.dp.toPx()
+        val right = size.width - 12.dp.toPx()
+        val top = 12.dp.toPx()
+        val bottom = size.height - 32.dp.toPx()
+        val rawMin = min(0f, points.minOf { it.cmPerThirtyDays })
+        val rawMax = max(1f, points.maxOf { it.cmPerThirtyDays })
+        val padding = max(.35f, (rawMax - rawMin) * .12f)
+        val yMin = rawMin - if (rawMin < 0f) padding else 0f
+        val yMax = rawMax + padding
+        fun y(value: Float): Float = bottom - (value - yMin) / max(.01f, yMax - yMin) * (bottom - top)
+        val zeroY = y(0f)
+        val slot = (right - left) / points.size
+        val barWidth = min(28.dp.toPx(), slot * .58f)
+        drawLine(outline, Offset(left, zeroY), Offset(right, zeroY), 1.dp.toPx())
+        points.forEachIndexed { index, point ->
+            val centerX = left + slot * (index + .5f)
+            val valueY = y(point.cmPerThirtyDays)
+            drawRect(
+                color = if (point.cmPerThirtyDays >= 0f) positiveColor else negativeColor,
+                topLeft = Offset(centerX - barWidth / 2f, min(zeroY, valueY)),
+                size = androidx.compose.ui.geometry.Size(barWidth, max(2.dp.toPx(), abs(zeroY - valueY))),
+            )
+        }
+        drawLine(outline, Offset(left, top), Offset(left, bottom), 1.dp.toPx())
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = labelColor.toArgb()
+            textSize = 10.dp.toPx()
+        }
+        drawContext.canvas.nativeCanvas.apply {
+            drawText(formatFloat(yMax), 2.dp.toPx(), top + 5.dp.toPx(), paint)
+            drawText(formatFloat(yMin), 2.dp.toPx(), bottom, paint)
+            drawText("см/30д", 2.dp.toPx(), (top + bottom) / 2, paint)
+            drawText(ageLabel(points.first().endDay), left, size.height - 7.dp.toPx(), paint)
+            val end = ageLabel(points.last().endDay)
+            drawText(end, right - paint.measureText(end), size.height - 7.dp.toPx(), paint)
+        }
+    }
+}
+
+@Composable
+private fun VaccinationTimelineCard(
+    data: AppData,
+    onAdd: () -> Unit,
+    onEdit: (LocalDate, VaccinationEntry) -> Unit,
+    onDelete: (LocalDate, String) -> Unit,
+) {
+    val entries = remember(data.days) {
+        data.days.values.flatMap { day ->
+            val date = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptyList()
+            day.vaccinations.map { date to it }
+        }.sortedBy { it.first }
+    }
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("ru")) }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Прививки", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Личный график: запланированные и сделанные", style = MaterialTheme.typography.bodySmall)
+                }
+                Button(onClick = onAdd) {
+                    Icon(Icons.Outlined.Add, contentDescription = null)
+                    Text("Добавить")
+                }
+            }
+            if (entries.isEmpty()) {
+                Text("Добавьте назначенную или уже сделанную прививку.")
+            } else {
+                entries.forEachIndexed { index, (date, entry) ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        VaccinationTimelineMarker(
+                            completed = entry.status == VaccinationStatus.COMPLETED,
+                            drawTop = index > 0,
+                            drawBottom = index < entries.lastIndex,
+                        )
+                        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                            Text(entry.name, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${date.format(dateFormatter)} · " +
+                                    if (entry.status == VaccinationStatus.COMPLETED) "сделана" else "запланирована",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (entry.note.isNotBlank()) Text(entry.note, style = MaterialTheme.typography.bodySmall)
+                        }
+                        IconButton(onClick = { onEdit(date, entry) }) { Icon(Icons.Outlined.Edit, "Изменить") }
+                        IconButton(onClick = { onDelete(date, entry.id) }) { Icon(Icons.Outlined.DeleteOutline, "Удалить") }
+                    }
+                }
+            }
+            Text(
+                "Приложение не назначает прививки: даты и названия вносятся по вашему календарю и рекомендациям врача.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun VaccinationTimelineMarker(completed: Boolean, drawTop: Boolean, drawBottom: Boolean) {
+    val color = if (completed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+    val line = MaterialTheme.colorScheme.outlineVariant
+    val surface = MaterialTheme.colorScheme.surface
+    Canvas(Modifier.width(26.dp).height(58.dp)) {
+        val x = size.width / 2f
+        val center = size.height / 2f
+        if (drawTop) drawLine(line, Offset(x, 0f), Offset(x, center), 2.dp.toPx())
+        if (drawBottom) drawLine(line, Offset(x, center), Offset(x, size.height), 2.dp.toPx())
+        drawCircle(color, radius = 6.dp.toPx(), center = Offset(x, center))
+        if (completed) drawCircle(surface, radius = 2.dp.toPx(), center = Offset(x, center))
     }
 }
 

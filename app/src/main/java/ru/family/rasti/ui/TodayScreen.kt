@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.RastiViewModel
@@ -49,6 +50,7 @@ import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.data.displayDose
 import ru.family.rasti.feeding.FeedingGuide
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -104,7 +106,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 shouldPulse = selectedDate == LocalDate.now() && vitaminD == null,
                 onClick = {
                     if (vitaminD == null && selectedDate == LocalDate.now()) {
-                        viewModel.addVitamin(selectedDate, "Витамин D", "2 капли", null)
+                        viewModel.addVitamin(selectedDate, "Витамин D", 2.0, "капля", null)
                     } else {
                         vitaminEditor = VitaminEditorState(selectedDate, vitaminD, "Витамин D")
                     }
@@ -140,7 +142,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             items(day.vitamins.sortedByDescending { it.time }, key = { it.id }) { entry ->
                 EntryRow(
                     title = entry.name,
-                    subtitle = listOf(entry.dose, entry.time).filter { it.isNotBlank() }.joinToString(" · "),
+                    subtitle = listOf(entry.displayDose(), entry.time).filter { it.isNotBlank() }.joinToString(" · "),
                     onEdit = { vitaminEditor = VitaminEditorState(selectedDate, entry) },
                     onDelete = { viewModel.removeVitamin(selectedDate, entry.id) },
                 )
@@ -223,12 +225,12 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             initial = state.entry,
             fixedName = state.fixedName,
             onDismiss = { vitaminEditor = null },
-            onSave = { targetDate, name, dose, time ->
+            onSave = { targetDate, name, amount, unit, time ->
                 val original = state.entry
                 if (original == null) {
-                    viewModel.addVitamin(targetDate, name, dose, time)
+                    viewModel.addVitamin(targetDate, name, amount, unit, time)
                 } else {
-                    viewModel.updateVitamin(state.originalDate, targetDate, original, name, dose, time)
+                    viewModel.updateVitamin(state.originalDate, targetDate, original, name, amount, unit, time)
                 }
                 vitaminEditor = null
             },
@@ -285,7 +287,10 @@ private fun VitaminDReminder(
     val taken = vitaminD != null
     FilledTonalButton(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(72.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .graphicsLayer { alpha = if (shouldPulse) pulse else 1f },
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = if (taken) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -302,7 +307,7 @@ private fun VitaminDReminder(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                if (taken) listOf(vitaminD.dose, vitaminD.time).filter { it.isNotBlank() }.joinToString(" · ")
+                if (taken) listOf(vitaminD.displayDose(), vitaminD.time).filter { it.isNotBlank() }.joinToString(" · ")
                 else "Ещё не принят — нажмите, чтобы отметить",
                 style = MaterialTheme.typography.bodySmall,
             )

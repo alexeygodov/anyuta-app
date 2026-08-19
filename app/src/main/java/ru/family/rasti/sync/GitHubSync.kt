@@ -10,6 +10,7 @@ import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.JsonCodec
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.data.VaccinationEntry
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
@@ -181,6 +182,7 @@ class GitHubSync {
         val firstNewer = first.updatedAt >= second.updatedAt
         val deletedFoodIds = first.deletedFoodIds + second.deletedFoodIds
         val deletedVitaminIds = first.deletedVitaminIds + second.deletedVitaminIds
+        val deletedVaccinationIds = first.deletedVaccinationIds + second.deletedVaccinationIds
         val measurementDeletedAt = listOfNotNull(first.measurementDeletedAt, second.measurementDeletedAt).maxOrNull()
         val newestMeasurement = newerMeasurement(first.measurement, second.measurement)
         val visibleMeasurement = newestMeasurement?.takeIf { measurement ->
@@ -192,8 +194,15 @@ class GitHubSync {
                 .filterNot { it.id in deletedFoodIds },
             vitamins = mergeById(first.vitamins, second.vitamins, VitaminEntry::id, VitaminEntry::updatedAt)
                 .filterNot { it.id in deletedVitaminIds },
+            vaccinations = mergeById(
+                first.vaccinations,
+                second.vaccinations,
+                VaccinationEntry::id,
+                VaccinationEntry::updatedAt,
+            ).filterNot { it.id in deletedVaccinationIds },
             deletedFoodIds = deletedFoodIds,
             deletedVitaminIds = deletedVitaminIds,
+            deletedVaccinationIds = deletedVaccinationIds,
             measurement = visibleMeasurement,
             measurementDeletedAt = measurementDeletedAt,
             note = if (firstNewer) first.note else second.note,

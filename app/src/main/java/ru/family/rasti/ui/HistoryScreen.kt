@@ -28,6 +28,7 @@ import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.data.displayDose
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -91,8 +92,8 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             initialDate = edit.date,
             initial = edit.entry,
             onDismiss = { vitaminEdit = null },
-            onSave = { targetDate, name, dose, time ->
-                viewModel.updateVitamin(edit.date, targetDate, edit.entry, name, dose, time)
+            onSave = { targetDate, name, amount, unit, time ->
+                viewModel.updateVitamin(edit.date, targetDate, edit.entry, name, amount, unit, time)
                 vitaminEdit = null
             },
         )
@@ -167,7 +168,7 @@ private fun HistoryDay(
             day.vitamins.sortedBy { it.time }.forEach { entry ->
                 EditableHistoryRow(
                     title = entry.name,
-                    subtitle = listOf(entry.dose, entry.time).filter { it.isNotBlank() }.joinToString(" · "),
+                    subtitle = listOf(entry.displayDose(), entry.time).filter { it.isNotBlank() }.joinToString(" · "),
                     onEdit = { onVitaminEdit(entry) },
                 )
             }
