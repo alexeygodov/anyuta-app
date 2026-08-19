@@ -50,6 +50,12 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Require permanent signing for version releases
+        if: startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.configured != 'true'
+        run: |
+          echo "::error::Version releases require SIGNING_KEY_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD"
+          exit 1
+
       - name: Test and build APK
         run: |
           chmod +x gradlew

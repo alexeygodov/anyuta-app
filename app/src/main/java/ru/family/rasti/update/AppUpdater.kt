@@ -23,7 +23,7 @@ object AppUpdater {
     private const val LATEST_RELEASE_URL =
         "https://api.github.com/repos/alexeygodov/anyuta-app/releases/latest"
 
-    fun check(currentVersion: String, token: String = ""): UpdateInfo? {
+    fun check(currentVersion: String): UpdateInfo? {
         val connection = URI(LATEST_RELEASE_URL).toURL().openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 15_000
@@ -31,11 +31,10 @@ object AppUpdater {
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             connection.setRequestProperty("User-Agent", "Anyuta-Android")
-            if (token.isNotBlank()) connection.setRequestProperty("Authorization", "Bearer $token")
             val status = connection.responseCode
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status == 404) throw IOException("Релиз не найден или токен не имеет доступа к anyuta-app")
+            if (status == 404) throw IOException("В GitHub Releases пока нет опубликованной версии")
             if (status !in 200..299) throw IOException("GitHub вернул ошибку $status")
             val json = JSONObject(body)
             val version = json.getString("tag_name").removePrefix("v")
@@ -61,17 +60,17 @@ object AppUpdater {
         }
     }
 
-    fun download(context: Context, update: UpdateInfo, token: String = ""): File {
+    fun download(context: Context, update: UpdateInfo): File {
         val directory = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(directory, "anyuta-${update.versionName}.apk")
-        var connection = openDownloadConnection(update.downloadUrl, token)
+        var connection = openDownloadConnection(update.downloadUrl)
         return try {
             var status = connection.responseCode
             if (status in setOf(301, 302, 303, 307, 308)) {
                 val redirect = connection.getHeaderField("Location")
                     ?: throw IOException("GitHub не вернул адрес APK")
                 connection.disconnect()
-                connection = openDownloadConnection(redirect, "")
+                connection = openDownloadConnection(redirect)
                 status = connection.responseCode
             }
             if (status !in 200..299) throw IOException("Не удалось скачать APK: HTTP $status")
@@ -100,7 +99,7 @@ object AppUpdater {
         }
     }
 
-    private fun openDownloadConnection(url: String, token: String): HttpURLConnection =
+    private fun openDownloadConnection(url: String): HttpURLConnection =
         (URI(url).toURL().openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = false
             connectTimeout = 20_000
@@ -108,7 +107,6 @@ object AppUpdater {
             setRequestProperty("Accept", "application/octet-stream")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("User-Agent", "Anyuta-Android")
-            if (token.isNotBlank()) setRequestProperty("Authorization", "Bearer $token")
         }
 
     fun requestInstall(context: Context, apk: File): Boolean {

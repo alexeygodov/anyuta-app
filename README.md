@@ -59,13 +59,13 @@ Settings → Developer settings → Personal access tokens → Fine-grained toke
 
 Для token задайте:
 
-- Repository access: `anyuta-data` и приватный `anyuta-app`;
+- Repository access: только приватный `anyuta-data`;
 - Repository permissions → Contents: `Read and write`;
 - разумный срок действия.
 
 Нажмите **Generate token** и сразу скопируйте полученную строку: обычно она начинается с `github_pat_`. Именно эту строку нужно вставить в поле **«Токен доступа GitHub»** в приложении. Это не SSH-ключ, не пароль от GitHub и не ключ подписи APK.
 
-В приложении введите владельца `alexeygodov`, репозиторий `anyuta-data`, ветку `main` и token. Доступ к `anyuta-app` нужен только потому, что репозиторий приложения приватный и без авторизации GitHub не отдаст APK из Releases. У каждого взрослого желательно иметь свой token. Он хранится только на конкретном телефоне в зашифрованном виде. Не отправляйте token в чат и не добавляйте его в исходники, JSON или GitHub Actions secrets.
+В приложении введите владельца `alexeygodov`, репозиторий `anyuta-data`, ветку `main` и token. Публичные обновления из `anyuta-app` скачиваются без token. У каждого взрослого желательно иметь свой token для `anyuta-data`. Он хранится только на конкретном телефоне в зашифрованном виде. Не отправляйте token в чат и не добавляйте его в исходники, JSON или GitHub Actions secrets.
 
 ## Получение APK без Android Studio
 
@@ -111,6 +111,8 @@ keytool -genkeypair -v -keystore anyuta-release.jks -alias anyuta -keyalg RSA -k
 - `KEY_PASSWORD`.
 
 Следующий workflow соберёт подписанный release APK. Файл `anyuta-release.jks` и пароли нельзя коммитить. Если ключ потерять, Android не позволит устанавливать новые версии поверх старой.
+
+Workflow намеренно не публикует version tag без этих Secrets: временная debug-подпись меняется между GitHub runners и ломает обновление поверх установленного APK.
 
 ## Локальная сборка
 

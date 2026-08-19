@@ -125,7 +125,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             SettingsCard("Синхронизация через GitHub") {
                 Text(
                     "Здесь нужен не SSH-ключ и не пароль, а отдельный fine-grained personal access token. " +
-                        "Он используется для данных и скачивания приватных обновлений.",
+                        "Он используется только для приватных семейных данных.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedButton(
@@ -136,7 +136,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     Text("  Создать токен на GitHub")
                 }
                 Text(
-                    "На открывшейся странице выберите Repository access → Only select repositories → anyuta-data и anyuta-app. " +
+                    "На открывшейся странице выберите Repository access → Only select repositories → anyuta-data. " +
                         "Для Contents оставьте Read and write, нажмите Generate token и сразу скопируйте результат.",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -193,7 +193,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                             updateBusy = true
                             if (update == null) {
                                 runCatching {
-                                    withContext(Dispatchers.IO) { AppUpdater.check(BuildConfig.VERSION_NAME, token.trim()) }
+                                    withContext(Dispatchers.IO) { AppUpdater.check(BuildConfig.VERSION_NAME) }
                                 }.onSuccess { result ->
                                     availableUpdate = result
                                     updateMessage = if (result == null) {
@@ -207,7 +207,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                             } else {
                                 runCatching {
                                     val cached = downloadedApkPath?.let(::File)?.takeIf(File::exists)
-                                    cached ?: withContext(Dispatchers.IO) { AppUpdater.download(context, update, token.trim()) }
+                                    cached ?: withContext(Dispatchers.IO) { AppUpdater.download(context, update) }
                                 }.onSuccess { apk ->
                                     downloadedApkPath = apk.absolutePath
                                     val installerOpened = runCatching { AppUpdater.requestInstall(context, apk) }.getOrElse { error ->
@@ -245,8 +245,8 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Text(
-                    "Для приватного anyuta-app токен выше должен иметь доступ к anyuta-app и anyuta-data. " +
-                        "Android один раз попросит разрешить установку из приложения «Анюта».",
+                    "Обновления скачиваются из публичного anyuta-app без токена. Android один раз попросит " +
+                        "разрешить установку из приложения «Анюта».",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
