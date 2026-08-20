@@ -211,6 +211,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             initial = state.entry,
             fixedName = state.fixedName,
             fixedUnit = state.fixedName?.let { "мл" },
+            days = viewModel.data.days,
             onDismiss = { foodEditor = null },
             onSave = { targetDate, name, amount, unit, time ->
                 val original = state.entry

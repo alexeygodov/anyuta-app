@@ -14,11 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -30,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
@@ -64,6 +65,7 @@ internal fun FoodEditorDialog(
     initial: FoodEntry? = null,
     fixedName: String? = null,
     fixedUnit: String? = null,
+    days: Map<String, DayRecord> = emptyMap(),
     onDismiss: () -> Unit,
     onSave: (LocalDate, String, Double, String, String) -> Unit,
 ) {
@@ -77,11 +79,12 @@ internal fun FoodEditorDialog(
         mutableStateOf(normalizeMilkAmount((initial?.amount ?: 100.0).toFloat()))
     }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initial?.unit ?: fixedUnit ?: "г") }
-    var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
-    val date = LocalDate.parse(dateRaw)
     val amountNumber = if (usesMilkSlider) milkAmount.toDouble() else amount.replace(',', '.').toDoubleOrNull()
     val normalizedTime = normalizeTimeToFiveMinutes(time)
+    val milkSuggestions = remember(days, usesMilkSlider, feedingName) {
+        if (usesMilkSlider) popularMilkAmounts(days.values, feedingName) else emptyList()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -90,13 +93,12 @@ internal fun FoodEditorDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (fixedName == null) {
                     OutlinedTextField(name, { name = it }, label = { Text("Название") }, singleLine = true)
-                } else {
-                    Text(fixedName)
                 }
                 if (usesMilkSlider) {
                     BottleAmountPicker(
                         amountMl = milkAmount,
                         onAmountChange = { milkAmount = normalizeMilkAmount(it) },
+                        suggestions = milkSuggestions,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else {
@@ -121,17 +123,12 @@ internal fun FoodEditorDialog(
                         }
                     }
                 }
-                DateTimePickerRow(
-                    date = date,
-                    time = time,
-                    onDateChange = { dateRaw = it.toString() },
-                    onTimeChange = { time = it },
-                )
+                TimeInput(time, onTimeChange = { time = it })
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, name.trim(), amountNumber ?: 0.0, fixedUnit ?: unit.trim(), normalizedTime ?: time) },
+                onClick = { onSave(initialDate, name.trim(), amountNumber ?: 0.0, fixedUnit ?: unit.trim(), normalizedTime ?: time) },
                 enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0 &&
                     (fixedUnit != null || unit.isNotBlank()) && normalizedTime != null,
             ) { Text(if (initial == null) "Добавить" else "Сохранить") }
@@ -155,9 +152,7 @@ internal fun VitaminEditorDialog(
         mutableStateOf(initial?.amount?.let(::formatNumber) ?: if (fixedName == "Витамин D") "2" else "")
     }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initial?.unit ?: if (fixedName == "Витамин D") "капля" else "ед.") }
-    var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
-    val date = LocalDate.parse(dateRaw)
     val amountNumber = amount.replace(',', '.').toDoubleOrNull()
     val normalizedTime = normalizeTimeToFiveMinutes(time)
 
@@ -168,8 +163,6 @@ internal fun VitaminEditorDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (fixedName == null) {
                     OutlinedTextField(name, { name = it }, label = { Text("Название") }, singleLine = true)
-                } else {
-                    Text(fixedName)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -189,17 +182,12 @@ internal fun VitaminEditorDialog(
                         singleLine = true,
                     )
                 }
-                DateTimePickerRow(
-                    date = date,
-                    time = time,
-                    onDateChange = { dateRaw = it.toString() },
-                    onTimeChange = { time = it },
-                )
+                TimeInput(time, onTimeChange = { time = it })
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, name.trim(), amountNumber ?: 0.0, unit.trim(), normalizedTime ?: time) },
+                onClick = { onSave(initialDate, name.trim(), amountNumber ?: 0.0, unit.trim(), normalizedTime ?: time) },
                 enabled = name.isNotBlank() && amountNumber != null && amountNumber > 0.0 && unit.isNotBlank() && normalizedTime != null,
             ) { Text(if (initial == null) "Отметить" else "Сохранить") }
         },
@@ -217,9 +205,7 @@ internal fun MeasurementEditorDialog(
     val stateKey = "${initial?.updatedAt}-$initialDate"
     var height by rememberSaveable(stateKey) { mutableStateOf(initial?.heightCm?.let(::formatNumber).orEmpty()) }
     var weight by rememberSaveable(stateKey) { mutableStateOf(initial?.weightKg?.let(::formatNumber).orEmpty()) }
-    var dateRaw by rememberSaveable(stateKey) { mutableStateOf(initialDate.toString()) }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
-    val date = LocalDate.parse(dateRaw)
     val heightNumber = height.replace(',', '.').toDoubleOrNull()
     val weightNumber = weight.replace(',', '.').toDoubleOrNull()
     val validHeight = height.isBlank() || (heightNumber != null && heightNumber > 0)
@@ -247,35 +233,17 @@ internal fun MeasurementEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
-                DateTimePickerRow(
-                    date = date,
-                    time = time,
-                    onDateChange = { dateRaw = it.toString() },
-                    onTimeChange = { time = it },
-                )
+                TimeInput(time, onTimeChange = { time = it })
             }
         },
         confirmButton = {
             Button(
-                onClick = { onSave(date, heightNumber, weightNumber, normalizedTime ?: time) },
+                onClick = { onSave(initialDate, heightNumber, weightNumber, normalizedTime ?: time) },
                 enabled = validHeight && validWeight && (height.isNotBlank() || weight.isNotBlank()) && normalizedTime != null,
             ) { Text("Сохранить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
-}
-
-@Composable
-internal fun DateTimePickerRow(
-    date: LocalDate,
-    time: String,
-    onDateChange: (LocalDate) -> Unit,
-    onTimeChange: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        DatePickerButton(date, onDateChange, Modifier.fillMaxWidth())
-        TimeInput(time, onTimeChange)
-    }
 }
 
 @Composable
@@ -307,16 +275,13 @@ internal fun DatePickerButton(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+private val wheelItemHeight = 44.dp
+
 @Composable
 private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
     val selected = normalizeTimeToFiveMinutes(time)?.let { LocalTime.parse(it, timeFormatter) }
         ?: roundedCurrentTime()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Outlined.Schedule, contentDescription = null)
-            Text("  Время — прокрутите вверх или вниз", style = MaterialTheme.typography.labelLarge)
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -325,16 +290,18 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
             NumberWheel(
                 values = (0..23).toList(),
                 selectedValue = selected.hour,
-                contentDescription = "Часы",
+                label = "Часы",
                 onValueSelected = { hour ->
                     onTimeChange(LocalTime.of(hour, selected.minute).format(timeFormatter))
                 },
             )
-            Text(" : ", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Box(Modifier.height(wheelItemHeight * 3), contentAlignment = Alignment.Center) {
+                Text(":", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            }
             NumberWheel(
                 values = (0..55 step 5).toList(),
                 selectedValue = selected.minute,
-                contentDescription = "Минуты",
+                label = "Минуты",
                 onValueSelected = { minute ->
                     onTimeChange(LocalTime.of(selected.hour, minute).format(timeFormatter))
                 },
@@ -351,68 +318,64 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
 private fun NumberWheel(
     values: List<Int>,
     selectedValue: Int,
-    contentDescription: String,
+    label: String,
     onValueSelected: (Int) -> Unit,
 ) {
-    val valueCount = values.size
-    val selectedOffset = values.indexOf(selectedValue).takeIf { it >= 0 }
-        ?: values.indices.minBy { abs(values[it] - selectedValue) }
-    val middle = 5_000
-    val initialIndex = remember {
-        middle - middle % valueCount + selectedOffset
-    }
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
+    val listState = rememberLazyListState()
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-    val viewportCenter = (listState.layoutInfo.viewportStartOffset + listState.layoutInfo.viewportEndOffset) / 2
-    val selectedIndex = listState.layoutInfo.visibleItemsInfo.minByOrNull { item ->
-        abs(item.offset + item.size / 2 - viewportCenter)
-    }?.index ?: listState.firstVisibleItemIndex
+    var positioned by remember { mutableStateOf(false) }
+    val centeredIndex by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            if (info.visibleItemsInfo.isEmpty()) {
+                -1
+            } else {
+                val center = (info.viewportStartOffset + info.viewportEndOffset) / 2
+                info.visibleItemsInfo.minByOrNull { abs(it.offset + it.size / 2 - center) }?.index ?: -1
+            }
+        }
+    }
 
-    LaunchedEffect(listState.isScrollInProgress, selectedIndex) {
-        if (!listState.isScrollInProgress) {
-            onValueSelected(values[Math.floorMod(selectedIndex, valueCount)])
+    LaunchedEffect(Unit) {
+        listState.scrollToItem(values.indexOf(selectedValue).coerceAtLeast(0))
+        positioned = true
+    }
+    LaunchedEffect(listState.isScrollInProgress, centeredIndex) {
+        if (positioned && !listState.isScrollInProgress && centeredIndex >= 0 && values[centeredIndex] != selectedValue) {
+            onValueSelected(values[centeredIndex])
         }
     }
     LaunchedEffect(selectedValue) {
-        val currentValue = values[Math.floorMod(selectedIndex, valueCount)]
-        if (currentValue != selectedValue) {
-            val base = selectedIndex - Math.floorMod(selectedIndex, valueCount)
-            val offset = values.indexOf(selectedValue).takeIf { it >= 0 }
-                ?: values.indices.minBy { abs(values[it] - selectedValue) }
-            val target = listOf(base + offset, base - valueCount + offset, base + valueCount + offset)
-                .filter { it >= 0 }
-                .minBy { abs(it - selectedIndex) }
-            listState.scrollToItem(target)
+        val index = values.indexOf(selectedValue)
+        if (!listState.isScrollInProgress && index >= 0 && centeredIndex >= 0 && centeredIndex != index) {
+            listState.animateScrollToItem(index)
         }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier
-                .width(92.dp)
-                .height(144.dp),
+            modifier = Modifier.width(64.dp).height(wheelItemHeight * 3),
             contentAlignment = Alignment.Center,
         ) {
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .height(wheelItemHeight)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
             )
             LazyColumn(
                 state = listState,
                 flingBehavior = flingBehavior,
-                contentPadding = PaddingValues(vertical = 48.dp),
+                contentPadding = PaddingValues(vertical = wheelItemHeight),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                items(count = 10_000) { index ->
-                    val value = values[index % valueCount]
-                    val isSelected = index == selectedIndex
-                    Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
+                items(values.size) { index ->
+                    val isSelected = index == centeredIndex
+                    Box(Modifier.fillMaxWidth().height(wheelItemHeight), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "%02d".format(Locale.US, value),
+                            text = "%02d".format(Locale.US, values[index]),
                             style = if (isSelected) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                             color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -421,7 +384,7 @@ private fun NumberWheel(
                 }
             }
         }
-        Text(contentDescription, style = MaterialTheme.typography.labelSmall)
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -455,3 +418,24 @@ internal fun adjustTimeInput(value: String, minutes: Long): String {
 
 internal fun normalizeMilkAmount(value: Float): Float =
     ((value / 5f).roundToInt() * 5f).coerceIn(0f, 200f)
+
+internal fun popularMilkAmounts(days: Collection<DayRecord>, feedingName: String, limit: Int = 4): List<Int> {
+    val normalizedName = feedingName.trim().lowercase()
+    if (normalizedName.isEmpty()) return emptyList()
+    return days.asSequence()
+        .flatMap { it.food.asSequence() }
+        .filter {
+            it.name.trim().lowercase() == normalizedName &&
+                it.unit.trim().lowercase() in setOf("мл", "ml") &&
+                it.amount > 0
+        }
+        .groupBy { it.amount.roundToInt() }
+        .mapValues { (_, entries) -> entries.size to entries.maxOf { entry -> entry.updatedAt } }
+        .entries
+        .sortedWith(
+            compareByDescending<Map.Entry<Int, Pair<Int, String>>> { it.value.first }
+                .thenByDescending { it.value.second },
+        )
+        .take(limit)
+        .map { it.key }
+}

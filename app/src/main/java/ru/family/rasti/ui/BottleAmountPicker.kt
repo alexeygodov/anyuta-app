@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +42,7 @@ private val milkColor = Color(0xFFFFB04D)
 internal fun BottleAmountPicker(
     amountMl: Float,
     onAmountChange: (Float) -> Unit,
+    suggestions: List<Int> = emptyList(),
     modifier: Modifier = Modifier,
     maxMl: Int = 200,
     stepMl: Int = 5,
@@ -183,13 +183,11 @@ internal fun BottleAmountPicker(
             }
         }
 
+        val chips = suggestions.ifEmpty { listOf(60, 90, 120, 150) }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf(60, 90, 120, 150).forEach { preset ->
+            chips.forEach { preset ->
                 AssistChip(onClick = { currentOnChange(preset.toFloat()) }, label = { Text("$preset") })
             }
-        }
-        FilledTonalButton(onClick = { currentOnChange(snap(amountMl + 10f)) }) {
-            Text("+10 мл")
         }
     }
 }

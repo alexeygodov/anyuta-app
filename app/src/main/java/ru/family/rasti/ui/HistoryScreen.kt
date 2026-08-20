@@ -79,6 +79,7 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             title = "Изменить запись",
             initialDate = edit.date,
             initial = edit.entry,
+            days = viewModel.data.days,
             onDismiss = { foodEdit = null },
             onSave = { targetDate, name, amount, unit, time ->
                 viewModel.updateFood(edit.date, targetDate, edit.entry, name, amount, unit, time)

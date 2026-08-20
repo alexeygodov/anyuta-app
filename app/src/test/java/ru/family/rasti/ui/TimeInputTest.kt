@@ -3,6 +3,8 @@ package ru.family.rasti.ui
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import ru.family.rasti.data.DayRecord
+import ru.family.rasti.data.FoodEntry
 
 class TimeInputTest {
     @Test
@@ -36,5 +38,32 @@ class TimeInputTest {
         assertEquals(105f, normalizeMilkAmount(103f), 0f)
         assertEquals(0f, normalizeMilkAmount(0f), 0f)
         assertEquals(200f, normalizeMilkAmount(500f), 0f)
+    }
+
+    @Test
+    fun popularMilkAmounts_returns_most_frequent_first() {
+        val updatedAt = "2026-08-19T20:00:00+04:00"
+        val days = listOf(
+            DayRecord(
+                date = "2026-08-18",
+                food = listOf(
+                    FoodEntry(time = "08:00", name = "Молоко", amount = 120.0, unit = "мл", updatedAt = updatedAt),
+                    FoodEntry(time = "12:00", name = "Молоко", amount = 120.0, unit = "мл", updatedAt = updatedAt),
+                    FoodEntry(time = "16:00", name = "Молоко", amount = 90.0, unit = "мл", updatedAt = updatedAt),
+                ),
+            ),
+            DayRecord(
+                date = "2026-08-19",
+                food = listOf(
+                    FoodEntry(time = "09:00", name = "молоко", amount = 150.0, unit = "мл", updatedAt = updatedAt),
+                    FoodEntry(time = "13:00", name = "Смесь", amount = 200.0, unit = "мл", updatedAt = updatedAt),
+                    FoodEntry(time = "18:00", name = "Молоко", amount = 60.0, unit = "мл", updatedAt = updatedAt),
+                    FoodEntry(time = "20:00", name = "Каша", amount = 50.0, unit = "г", updatedAt = updatedAt),
+                ),
+            ),
+        )
+        assertEquals(listOf(120, 90, 150, 60), popularMilkAmounts(days, "Молоко"))
+        assertEquals(listOf(200), popularMilkAmounts(days, "Смесь"))
+        assertEquals(emptyList<Int>(), popularMilkAmounts(days, "Каша"))
     }
 }
