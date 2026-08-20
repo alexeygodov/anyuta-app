@@ -112,13 +112,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             item {
                 VitaminDReminder(
                     shouldPulse = selectedDate == LocalDate.now(),
-                    onClick = {
-                        if (selectedDate == LocalDate.now()) {
-                            viewModel.addVitamin(selectedDate, "Витамин D", 2.0, "капля", null)
-                        } else {
-                            vitaminEditor = VitaminEditorState(selectedDate, null, "Витамин D")
-                        }
-                    },
+                    onClick = { vitaminEditor = VitaminEditorState(selectedDate, null, "Витамин D") },
                 )
             }
         }
@@ -502,7 +496,7 @@ private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): Last
     }
     val ago = when {
         minutesAgo == null -> null
-        minutesAgo < 1 -> "только что"
+        minutesAgo < 1 -> "Только что"
         minutesAgo < 60 -> "$minutesAgo мин назад"
         else -> {
             val rest = minutesAgo % 60
@@ -510,7 +504,12 @@ private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): Last
         }
     }
     val timeText = last.format(DateTimeFormatter.ofPattern("HH:mm"))
-    return LastFeedingInfo("Последнее питание: $timeText" + (ago?.let { " · $it" } ?: ""), minutesAgo)
+    val text = if (ago != null) {
+        "$ago, последнее кормление в $timeText"
+    } else {
+        "Последнее кормление в $timeText"
+    }
+    return LastFeedingInfo(text, minutesAgo)
 }
 
 @Composable
