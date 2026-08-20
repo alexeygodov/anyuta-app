@@ -90,9 +90,9 @@ internal fun BottleAmountPicker(
                 val base = 0.135f * h
                 val halfBase = 0.10f * w
                 moveTo(w / 2 - halfBase, base)
-                quadraticBezierTo(w / 2 - halfBase, 0.05f * h, w / 2 - 0.030f * w, 0.022f * h)
-                quadraticBezierTo(w / 2, 0.008f * h, w / 2 + 0.030f * w, 0.022f * h)
-                quadraticBezierTo(w / 2 + halfBase, 0.05f * h, w / 2 + halfBase, base)
+                quadraticTo(w / 2 - halfBase, 0.05f * h, w / 2 - 0.030f * w, 0.022f * h)
+                quadraticTo(w / 2, 0.008f * h, w / 2 + 0.030f * w, 0.022f * h)
+                quadraticTo(w / 2 + halfBase, 0.05f * h, w / 2 + halfBase, base)
                 close()
             }
             drawPath(nipplePath, color = glassColor)
@@ -106,13 +106,13 @@ internal fun BottleAmountPicker(
             val bottomRadius = 0.09f * w
             val bodyPath = Path().apply {
                 moveTo(0.27f * w, shoulderTop + 0.004f * h)
-                quadraticBezierTo(bodyLeft + 0.03f * w, shoulderTop + 0.01f * h, bodyLeft, bodyTop)
+                quadraticTo(bodyLeft + 0.03f * w, shoulderTop + 0.01f * h, bodyLeft, bodyTop)
                 lineTo(bodyLeft, bodyBottom - bottomRadius)
-                quadraticBezierTo(bodyLeft, bodyBottom, bodyLeft + bottomRadius, bodyBottom)
+                quadraticTo(bodyLeft, bodyBottom, bodyLeft + bottomRadius, bodyBottom)
                 lineTo(bodyRight - bottomRadius, bodyBottom)
-                quadraticBezierTo(bodyRight, bodyBottom, bodyRight, bodyBottom - bottomRadius)
+                quadraticTo(bodyRight, bodyBottom, bodyRight, bodyBottom - bottomRadius)
                 lineTo(bodyRight, bodyTop)
-                quadraticBezierTo(bodyRight - 0.03f * w, shoulderTop + 0.01f * h, 0.73f * w, shoulderTop + 0.004f * h)
+                quadraticTo(bodyRight - 0.03f * w, shoulderTop + 0.01f * h, 0.73f * w, shoulderTop + 0.004f * h)
                 close()
             }
             drawPath(bodyPath, color = glassColor)
