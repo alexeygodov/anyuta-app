@@ -55,6 +55,7 @@ import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.displayDose
 import ru.family.rasti.feeding.FeedingGuide
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -92,27 +93,25 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text(viewModel.data.profile.name, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        }
-        item {
             DateNavigator(
                 date = selectedDate,
                 onPrevious = { selectedDateRaw = selectedDate.minusDays(1).toString() },
                 onNext = { selectedDateRaw = selectedDate.plusDays(1).toString() },
             )
         }
-        item {
-            VitaminDReminder(
-                vitaminD = vitaminD,
-                shouldPulse = selectedDate == LocalDate.now() && vitaminD == null,
-                onClick = {
-                    if (vitaminD == null && selectedDate == LocalDate.now()) {
-                        viewModel.addVitamin(selectedDate, "Витамин D", 2.0, "капля", null)
-                    } else {
-                        vitaminEditor = VitaminEditorState(selectedDate, vitaminD, "Витамин D")
-                    }
-                },
-            )
+        if (vitaminD == null) {
+            item {
+                VitaminDReminder(
+                    shouldPulse = selectedDate == LocalDate.now(),
+                    onClick = {
+                        if (selectedDate == LocalDate.now()) {
+                            viewModel.addVitamin(selectedDate, "Витамин D", 2.0, "капля", null)
+                        } else {
+                            vitaminEditor = VitaminEditorState(selectedDate, null, "Витамин D")
+                        }
+                    },
+                )
+            }
         }
         item {
             MilkProgressCard(
@@ -258,7 +257,6 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun VitaminDReminder(
-    vitaminD: VitaminEntry?,
     shouldPulse: Boolean,
     onClick: () -> Unit,
 ) {
@@ -269,7 +267,6 @@ private fun VitaminDReminder(
         animationSpec = infiniteRepeatable(animation = tween(480), repeatMode = RepeatMode.Reverse),
         label = "vitamin-d-attention",
     )
-    val taken = vitaminD != null
     FilledTonalButton(
         onClick = onClick,
         modifier = Modifier
@@ -281,25 +278,17 @@ private fun VitaminDReminder(
                 scaleY = if (shouldPulse) .97f + pulse * .05f else 1f
             },
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = if (taken) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer, pulse * .38f)
-            },
-            contentColor = if (taken) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onError,
+            containerColor = lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer, pulse * .38f),
+            contentColor = MaterialTheme.colorScheme.onError,
         ),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                if (taken) "Витамин D принят ✓" else "ВИТАМИН D НЕ ПРИНЯТ",
+                "ВИТАМИН D НЕ ПРИНЯТ",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            Text(
-                if (taken) listOf(vitaminD.displayDose(), vitaminD.time).filter { it.isNotBlank() }.joinToString(" · ")
-                else "НАЖМИТЕ СЕЙЧАС · 2 капли",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text("НАЖМИТЕ СЕЙЧАС · 2 капли", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -330,7 +319,10 @@ private fun MilkProgressCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Объём питания", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
+                Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
+            }
             if (guide != null) {
                 val progress = (consumed / guide.targetMl).toFloat().coerceIn(0f, 1f)
                 Text("${formatNumber(consumed)} из ≈${guide.targetMl} мл")
@@ -338,10 +330,7 @@ private fun MilkProgressCard(
             } else {
                 Text("Учтено: ${formatNumber(consumed)} мл")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
-                Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
-            }
+            lastFeedingText(date, milkEntries)?.let { Text(it, fontWeight = FontWeight.Medium) }
             Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(guide, milkEntries)
             if (milkEntries.isEmpty()) {
@@ -387,11 +376,12 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
         ) {
             IconButton(onClick = onPrevious) { Icon(Icons.Outlined.ChevronLeft, "Предыдущий день") }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val dayMonth = date.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru")))
                 Text(
                     when (date) {
-                        LocalDate.now() -> "Сегодня"
-                        LocalDate.now().minusDays(1) -> "Вчера"
-                        else -> date.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru")))
+                        LocalDate.now() -> "Сегодня, $dayMonth"
+                        LocalDate.now().minusDays(1) -> "Вчера, $dayMonth"
+                        else -> dayMonth
                     },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
@@ -467,6 +457,31 @@ private fun MetricValue(label: String, value: String) {
 private fun isVitaminD(entry: VitaminEntry): Boolean {
     val normalized = entry.name.lowercase().replace("ё", "е")
     return normalized.contains("витамин d") || normalized.contains("витамин д") || normalized.contains("d3")
+}
+
+private fun lastFeedingText(date: LocalDate, milkEntries: List<FoodEntry>): String? {
+    val last = milkEntries
+        .mapNotNull { entry -> runCatching { LocalTime.parse(entry.time) }.getOrNull()?.let { it to entry } }
+        .maxByOrNull { it.first }
+        ?.second
+        ?: return null
+    val ago = if (date == LocalDate.now()) {
+        runCatching { LocalTime.parse(last.time) }.getOrNull()?.let { time ->
+            val minutes = java.time.Duration.between(time, LocalTime.now()).toMinutes()
+            when {
+                minutes < 0 -> null
+                minutes < 1 -> "только что"
+                minutes < 60 -> "$minutes мин назад"
+                else -> {
+                    val rest = minutes % 60
+                    if (rest == 0L) "${minutes / 60} ч назад" else "${minutes / 60} ч $rest мин назад"
+                }
+            }
+        }
+    } else {
+        null
+    }
+    return "Последнее питание: ${last.time}" + (ago?.let { " · $it" } ?: "")
 }
 
 internal fun formatNumber(number: Double): String =
