@@ -18,59 +18,188 @@ import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-data class SyncResult(val data: AppData, val uploadedFiles: Int, val downloadedFiles: Int)
+data class SyncResult(
+    val data: AppData,
+    val uploadedFiles: Int,
+    val downloadedFiles: Int,
+    val state: SyncState,
+)
+
+data class SyncState(
+    val etag: String? = null,
+    val files: Map<String, RemoteState> = emptyMap(),
+)
+
+data class RemoteState(val sha: String, val updatedAt: String? = null)
+
+fun encodeSyncState(state: SyncState): String {
+    val files = JSONObject()
+    state.files.forEach { (path, file) ->
+        files.put(
+            path,
+            JSONObject()
+                .put("sha", file.sha)
+                .put("updatedAt", file.updatedAt ?: JSONObject.NULL),
+        )
+    }
+    return JSONObject()
+        .put("etag", state.etag ?: JSONObject.NULL)
+        .put("files", files)
+        .toString()
+}
+
+fun decodeSyncState(raw: String?): SyncState {
+    if (raw.isNullOrBlank()) return SyncState()
+    return runCatching {
+        val json = JSONObject(raw)
+        val filesJson = json.optJSONObject("files") ?: JSONObject()
+        val files = mutableMapOf<String, RemoteState>()
+        val keys = filesJson.keys()
+        while (keys.hasNext()) {
+            val path = keys.next()
+            val file = filesJson.getJSONObject(path)
+            files[path] = RemoteState(
+                sha = file.getString("sha"),
+                updatedAt = file.optString("updatedAt").ifBlank { null },
+            )
+        }
+        SyncState(
+            etag = json.optString("etag").ifBlank { null },
+            files = files,
+        )
+    }.getOrDefault(SyncState())
+}
+
+private val DAY_PATH_PATTERN = Regex("data/\\d{4}/\\d{2}/\\d{4}-\\d{2}-\\d{2}\\.json")
 
 class GitHubSync {
-    private data class RemoteFile(val path: String, val sha: String)
     private data class Content(val raw: String, val sha: String)
+    private data class Tree(val files: Map<String, String>, val etag: String?)
 
-    fun sync(config: GitHubConfig, local: AppData): SyncResult {
+    fun sync(config: GitHubConfig, local: AppData, state: SyncState = SyncState()): SyncResult {
         require(config.owner.isNotBlank()) { "Укажите владельца репозитория" }
         require(config.repo.isNotBlank()) { "Укажите репозиторий данных" }
         require(config.token.isNotBlank()) { "Вставьте GitHub token" }
 
-        val tree = listTree(config)
+        // При 304 дерево не изменилось: кеш sha из прошлой синхронизации актуален.
+        val tree = listTree(config, state.etag)
+        val remoteShas: Map<String, String> = tree?.files ?: state.files.mapValues { it.value.sha }
+        val newFiles = mutableMapOf<String, RemoteState>()
         var downloaded = 0
+        var uploaded = 0
+
         var profile = local.profile
-        val remoteProfile = getContent(config, "profile.json")?.let {
-            downloaded += 1
-            JsonCodec.decodeProfile(it.raw)
+        val profileSha = remoteShas["profile.json"]
+        val cachedProfileUpdatedAt = state.files["profile.json"]
+            ?.takeIf { it.sha == profileSha }
+            ?.updatedAt
+        when {
+            profileSha == null -> {
+                val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), null)
+                newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
+                uploaded += 1
+            }
+            cachedProfileUpdatedAt == profile.updatedAt -> {
+                newFiles["profile.json"] = RemoteState(profileSha, cachedProfileUpdatedAt)
+            }
+            cachedProfileUpdatedAt != null && profile.updatedAt > cachedProfileUpdatedAt -> {
+                // Удалённый профиль не менялся, локальный новее — только отправка.
+                val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), profileSha)
+                newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
+                uploaded += 1
+            }
+            else -> {
+                val remote = getContent(config, "profile.json")
+                if (remote == null) {
+                    val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), null)
+                    newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
+                    uploaded += 1
+                } else {
+                    downloaded += 1
+                    val remoteProfile = JsonCodec.decodeProfile(remote.raw)
+                    profile = newerProfile(profile, remoteProfile)
+                    if (profile != remoteProfile) {
+                        val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), remote.sha)
+                        newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
+                        uploaded += 1
+                    } else {
+                        newFiles["profile.json"] = RemoteState(remote.sha, remoteProfile.updatedAt)
+                    }
+                }
+            }
         }
-        if (remoteProfile != null) profile = newerProfile(profile, remoteProfile)
+
+        val dayShas = remoteShas.filterKeys { DAY_PATH_PATTERN.matches(it) }
+        val downloadPaths = mutableListOf<String>()
+        val uploadLocalOnly = mutableMapOf<String, DayRecord>()
+        for ((path, sha) in dayShas) {
+            val date = path.substringAfterLast('/').removeSuffix(".json")
+            val localDay = local.days[date]
+            val cachedUpdatedAt = state.files[path]
+                ?.takeIf { it.sha == sha }
+                ?.updatedAt
+            if (cachedUpdatedAt == null || localDay == null) {
+                downloadPaths += path
+            } else {
+                when {
+                    localDay.updatedAt == cachedUpdatedAt -> newFiles[path] = RemoteState(sha, cachedUpdatedAt)
+                    localDay.updatedAt > cachedUpdatedAt -> uploadLocalOnly[path] = localDay
+                    else -> downloadPaths += path
+                }
+            }
+        }
 
         val remoteDays = mutableMapOf<String, DayRecord>()
-        tree.filter { it.path.matches(Regex("data/\\d{4}/\\d{2}/\\d{4}-\\d{2}-\\d{2}\\.json")) }
-            .forEach { file ->
-                val content = getContent(config, file.path) ?: return@forEach
-                remoteDays[file.path] = JsonCodec.decodeDay(content.raw)
-                downloaded += 1
-            }
+        for (path in downloadPaths) {
+            val content = getContent(config, path) ?: continue
+            val day = JsonCodec.decodeDay(content.raw)
+            remoteDays[path] = day
+            newFiles[path] = RemoteState(content.sha, day.updatedAt)
+            downloaded += 1
+        }
 
         val mergedDays = local.days.toMutableMap()
         remoteDays.forEach { (_, remote) ->
             mergedDays[remote.date] = mergedDays[remote.date]?.let { mergeDay(it, remote) } ?: remote
         }
-        val merged = AppData(profile = profile, days = mergedDays)
 
-        var uploaded = 0
-        if (remoteProfile != profile) {
-            val sha = tree.firstOrNull { it.path == "profile.json" }?.sha
-                ?: getContent(config, "profile.json")?.sha
-            putContent(config, "profile.json", JsonCodec.encodeProfile(profile), sha)
-            uploaded += 1
-        }
-
-        merged.days.values.sortedBy { it.date }.forEach { day ->
+        for (day in mergedDays.values.toList()) {
             val path = dayPath(day.date)
-            val remote = remoteDays[path]
-            if (remote != day) {
-                val sha = tree.firstOrNull { it.path == path }?.sha
-                ?: getContent(config, path)?.sha
-                putWithConflictRetry(config, path, day, sha)
-                uploaded += 1
+            val remoteSha = remoteShas[path]
+            when {
+                remoteSha == null -> {
+                    val (sha, finalDay) = putDayWithConflictRetry(config, path, day, null)
+                    mergedDays[day.date] = finalDay
+                    newFiles[path] = RemoteState(sha, finalDay.updatedAt)
+                    uploaded += 1
+                }
+                uploadLocalOnly.containsKey(path) -> {
+                    val (sha, finalDay) = putDayWithConflictRetry(config, path, day, remoteSha)
+                    mergedDays[day.date] = finalDay
+                    newFiles[path] = RemoteState(sha, finalDay.updatedAt)
+                    uploaded += 1
+                }
+                remoteDays.containsKey(path) -> {
+                    val remote = remoteDays.getValue(path)
+                    if (remote != day) {
+                        val (sha, finalDay) = putDayWithConflictRetry(config, path, day, remoteSha)
+                        mergedDays[day.date] = finalDay
+                        newFiles[path] = RemoteState(sha, finalDay.updatedAt)
+                        uploaded += 1
+                    } else {
+                        newFiles[path] = RemoteState(remoteSha, remote.updatedAt)
+                    }
+                }
             }
         }
-        return SyncResult(merged, uploaded, downloaded)
+
+        val merged = AppData(profile = profile, days = mergedDays)
+        return SyncResult(
+            data = merged,
+            uploadedFiles = uploaded,
+            downloadedFiles = downloaded,
+            state = SyncState(etag = tree?.etag ?: state.etag, files = newFiles),
+        )
     }
 
     fun merge(first: AppData, second: AppData): AppData {
@@ -84,14 +213,19 @@ class GitHubSync {
         )
     }
 
-    private fun putWithConflictRetry(config: GitHubConfig, path: String, day: DayRecord, sha: String?) {
-        try {
-            putContent(config, path, JsonCodec.encodeDay(day), sha)
+    private fun putDayWithConflictRetry(
+        config: GitHubConfig,
+        path: String,
+        day: DayRecord,
+        sha: String?,
+    ): Pair<String, DayRecord> {
+        return try {
+            putContent(config, path, JsonCodec.encodeDay(day), sha) to day
         } catch (error: GitHubException) {
             if (error.status != 409) throw error
             val latest = getContent(config, path) ?: throw error
             val merged = mergeDay(JsonCodec.decodeDay(latest.raw), day)
-            putContent(config, path, JsonCodec.encodeDay(merged), latest.sha)
+            putContent(config, path, JsonCodec.encodeDay(merged), latest.sha) to merged
         }
     }
 
@@ -101,19 +235,21 @@ class GitHubSync {
         return "data/$year/$month/$date.json"
     }
 
-    private fun listTree(config: GitHubConfig): List<RemoteFile> {
+    private fun listTree(config: GitHubConfig, etag: String?): Tree? {
         val branch = encode(config.branch)
-        val response = request(config, "GET", "/git/trees/$branch?recursive=1", null, setOf(404, 409))
-        if (response.status == 404 || response.status == 409) return emptyList()
+        val headers = if (etag.isNullOrBlank()) emptyMap() else mapOf("If-None-Match" to etag)
+        val response = request(config, "GET", "/git/trees/$branch?recursive=1", null, setOf(304, 404, 409), headers)
+        if (response.status == 304) return null
+        if (response.status == 404 || response.status == 409) return Tree(emptyMap(), response.etag)
         val array = JSONObject(response.body).getJSONArray("tree")
-        return buildList {
-            for (index in 0 until array.length()) {
-                val item = array.getJSONObject(index)
-                if (item.optString("type") == "blob") {
-                    add(RemoteFile(item.getString("path"), item.getString("sha")))
-                }
+        val files = mutableMapOf<String, String>()
+        for (index in 0 until array.length()) {
+            val item = array.getJSONObject(index)
+            if (item.optString("type") == "blob") {
+                files[item.getString("path")] = item.getString("sha")
             }
         }
+        return Tree(files, response.etag)
     }
 
     private fun getContent(config: GitHubConfig, path: String): Content? {
@@ -124,17 +260,18 @@ class GitHubSync {
         return Content(raw = raw, sha = json.getString("sha"))
     }
 
-    private fun putContent(config: GitHubConfig, path: String, raw: String, sha: String?) {
+    private fun putContent(config: GitHubConfig, path: String, raw: String, sha: String?): String {
         val body = JSONObject()
             .put("message", "Анюта: обновление $path")
             .put("content", Base64.encodeToString(raw.toByteArray(), Base64.NO_WRAP))
             .put("branch", config.branch)
             .apply { sha?.let { put("sha", it) } }
             .toString()
-        request(config, "PUT", "/contents/${path.split('/').joinToString("/") { encode(it) }}", body)
+        val response = request(config, "PUT", "/contents/${path.split('/').joinToString("/") { encode(it) }}", body)
+        return JSONObject(response.body).getJSONObject("content").getString("sha")
     }
 
-    private data class Response(val status: Int, val body: String)
+    private data class Response(val status: Int, val body: String, val etag: String?)
 
     private fun request(
         config: GitHubConfig,
@@ -142,6 +279,7 @@ class GitHubSync {
         endpoint: String,
         body: String?,
         allowedErrors: Set<Int> = emptySet(),
+        headers: Map<String, String> = emptyMap(),
     ): Response {
         val url = "https://api.github.com/repos/${encode(config.owner)}/${encode(config.repo)}$endpoint"
         val connection = URI(url).toURL().openConnection() as HttpURLConnection
@@ -153,12 +291,14 @@ class GitHubSync {
             connection.setRequestProperty("Authorization", "Bearer ${config.token}")
             connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             connection.setRequestProperty("User-Agent", "Anyuta-Android")
+            headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
             if (body != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 connection.outputStream.use { it.write(body.toByteArray()) }
             }
             val status = connection.responseCode
+            val etag = connection.getHeaderField("ETag")
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
             val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (status !in 200..299 && status !in allowedErrors) {
@@ -166,7 +306,7 @@ class GitHubSync {
                     .orEmpty().ifBlank { "HTTP $status" }
                 throw GitHubException(status, message)
             }
-            Response(status, responseBody)
+            Response(status, responseBody, etag)
         } catch (error: GitHubException) {
             throw error
         } catch (error: IOException) {

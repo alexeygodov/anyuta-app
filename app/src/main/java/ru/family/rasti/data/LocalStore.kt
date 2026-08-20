@@ -6,6 +6,7 @@ import java.io.File
 
 class LocalStore(private val context: Context) {
     private val dataFile = File(context.filesDir, "rasti-data.json")
+    private val syncStateFile = File(context.filesDir, "rasti-sync-state.json")
     private val settings = context.getSharedPreferences("github_settings", Context.MODE_PRIVATE)
     private val tokenStore = SecureTokenStore(context)
 
@@ -18,6 +19,19 @@ class LocalStore(private val context: Context) {
         temporary.writeText(JsonCodec.encodeAppData(data))
         if (!temporary.renameTo(dataFile)) {
             dataFile.writeText(temporary.readText())
+            temporary.delete()
+        }
+    }
+
+    fun loadSyncState(): String? = runCatching {
+        if (syncStateFile.exists()) syncStateFile.readText() else null
+    }.getOrNull()
+
+    fun saveSyncState(raw: String) {
+        val temporary = File(context.filesDir, "rasti-sync-state.tmp")
+        temporary.writeText(raw)
+        if (!temporary.renameTo(syncStateFile)) {
+            syncStateFile.writeText(temporary.readText())
             temporary.delete()
         }
     }

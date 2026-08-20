@@ -24,6 +24,8 @@ import ru.family.rasti.data.VaccinationStatus
 import ru.family.rasti.data.day
 import ru.family.rasti.data.updateDay
 import ru.family.rasti.sync.GitHubSync
+import ru.family.rasti.sync.decodeSyncState
+import ru.family.rasti.sync.encodeSyncState
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
@@ -39,6 +41,7 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
     var statusMessage by mutableStateOf<String?>(null)
         private set
     private var syncRequested = false
+    private var syncState: String? = store.loadSyncState()
 
     init {
         viewModelScope.launch {
@@ -302,8 +305,14 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
     }
 
     fun saveGitHubConfig(config: GitHubConfig, showStatus: Boolean = true) {
-        githubConfig = config.copy(branch = config.branch.ifBlank { "main" })
-        store.saveGitHubConfig(githubConfig)
+        val updated = config.copy(branch = config.branch.ifBlank { "main" })
+        val previous = githubConfig
+        githubConfig = updated
+        store.saveGitHubConfig(updated)
+        if (previous.owner != updated.owner || previous.repo != updated.repo || previous.branch != updated.branch) {
+            syncState = null
+            store.saveSyncState("")
+        }
         if (showStatus) statusMessage = "Настройки GitHub сохранены"
     }
 
@@ -319,12 +328,16 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
         val syncer = GitHubSync()
         val snapshot = data
         val activeConfig = githubConfig
+        val activeState = decodeSyncState(syncState)
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { syncer.sync(activeConfig, snapshot) }
+                withContext(Dispatchers.IO) { syncer.sync(activeConfig, snapshot, activeState) }
             }.onSuccess { result ->
                 data = syncer.merge(data, result.data)
                 persist(syncAfter = false)
+                val encodedState = encodeSyncState(result.state)
+                syncState = encodedState
+                store.saveSyncState(encodedState)
                 if (showStatus) {
                     statusMessage = "Готово: получено ${result.downloadedFiles}, отправлено ${result.uploadedFiles}"
                 }
