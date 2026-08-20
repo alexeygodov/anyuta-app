@@ -3,6 +3,7 @@ package ru.family.rasti.ui
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,14 +14,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -32,6 +31,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -95,7 +95,7 @@ internal fun leapIntensity(referenceDate: LocalDate, date: LocalDate): Float =
         (1f - distance / 14f).coerceIn(0f, 1f)
     }
 
-private const val TOTAL_WEEKS = 76
+private const val WINDOW_DAYS = 28
 
 @Composable
 internal fun DevelopmentLeapCard(profile: ChildProfile) {
@@ -109,25 +109,25 @@ internal fun DevelopmentLeapCard(profile: ChildProfile) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Периоды скачков развития", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
-                "Шкала — недели от рождения · вертикаль — интенсивность беспокойства",
+                "Сегодня в центре · 4 недели до и после · номера — недели от рождения",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (referenceDate == null) {
                 Text("Укажите дату рождения в настройках.")
             } else {
-                val totalDays = TOTAL_WEEKS * 7
-                val points = remember(referenceDate) {
-                    (0..totalDays).map { day ->
-                        day to leapIntensity(referenceDate, referenceDate.plusDays(day.toLong()))
+                val windowStart = today.minusDays(WINDOW_DAYS.toLong())
+                val points = remember(referenceDate, today) {
+                    (0..WINDOW_DAYS * 2).map { day ->
+                        day to leapIntensity(referenceDate, windowStart.plusDays(day.toLong()))
                     }
                 }
-                val todayWeek = (ChronoUnit.DAYS.between(referenceDate, today).toFloat() / 7f)
-                    .takeIf { it in 0f..TOTAL_WEEKS.toFloat() }
                 var selectedLeap by remember { mutableStateOf<DevelopmentLeap?>(null) }
                 LeapIntensityCanvas(
                     points = points,
-                    todayWeek = todayWeek,
+                    windowStart = windowStart,
+                    referenceDate = referenceDate,
+                    today = today,
                     selectedLeapNumber = selectedLeap?.number,
                     onLeapSelected = { leap ->
                         selectedLeap = if (leap != null && leap.number == selectedLeap?.number) null else leap
@@ -184,34 +184,49 @@ internal fun DevelopmentLeapCard(profile: ChildProfile) {
 @Composable
 private fun LeapIntensityCanvas(
     points: List<Pair<Int, Float>>,
-    todayWeek: Float?,
+    windowStart: LocalDate,
+    referenceDate: LocalDate,
+    today: LocalDate,
     selectedLeapNumber: Int?,
     onLeapSelected: (DevelopmentLeap?) -> Unit,
 ) {
     val curveColor = MaterialTheme.colorScheme.error
     val todayColor = MaterialTheme.colorScheme.primary
-    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = .22f)
+    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = .14f)
     val axisColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
+
+    val peaks = remember(windowStart, referenceDate) {
+        developmentLeaps.mapNotNull { leap ->
+            val day = ChronoUnit.DAYS.between(windowStart, referenceDate.plusWeeks(leap.peakWeek.toLong())).toInt()
+            if (day in 0..WINDOW_DAYS * 2) leap to day else null
+        }
+    }
+    val weekTicks = remember(windowStart, referenceDate) {
+        (0..200).mapNotNull { week ->
+            val day = ChronoUnit.DAYS.between(windowStart, referenceDate.plusWeeks(week.toLong())).toInt()
+            if (day in 0..WINDOW_DAYS * 2) week to day else null
+        }
+    }
 
     Canvas(
         Modifier
             .fillMaxWidth()
             .height(230.dp)
-            .pointerInput(Unit) {
+            .pointerInput(windowStart, referenceDate) {
                 detectTapGestures { offset ->
                     val left = 8.dp.toPx()
                     val right = size.width - 8.dp.toPx()
                     val top = 26.dp.toPx()
-                    val totalDays = (TOTAL_WEEKS * 7).toFloat()
-                    val nearest = developmentLeaps
-                        .map { leap ->
-                            val px = left + (leap.peakWeek * 7).toFloat() / totalDays * (right - left)
+                    val totalDays = (WINDOW_DAYS * 2).toFloat()
+                    val nearest = peaks
+                        .map { (leap, day) ->
+                            val px = left + day / totalDays * (right - left)
                             leap to hypot(px - offset.x, top - offset.y)
                         }
                         .minByOrNull { (_, distance) -> distance }
-                    onLeapSelected(nearest?.takeIf { (_, distance) -> distance <= 18.dp.toPx() }?.first)
+                    onLeapSelected(nearest?.takeIf { (_, distance) -> distance <= 20.dp.toPx() }?.first)
                 }
             },
     ) {
@@ -219,11 +234,14 @@ private fun LeapIntensityCanvas(
         val right = size.width - 8.dp.toPx()
         val top = 26.dp.toPx()
         val bottom = size.height - 32.dp.toPx()
-        val totalDays = (TOTAL_WEEKS * 7).toFloat()
+        val totalDays = (WINDOW_DAYS * 2).toFloat()
         fun x(day: Float): Float = left + day / totalDays * (right - left)
         fun y(intensity: Float): Float = bottom - intensity.coerceIn(0f, 1f) * (bottom - top)
 
-        listOf(0.25f, 0.5f, 0.75f).forEach { level ->
+        weekTicks.forEach { (_, day) ->
+            drawLine(gridColor, Offset(x(day.toFloat()), top), Offset(x(day.toFloat()), bottom), 1.dp.toPx())
+        }
+        listOf(0.5f, 1f).forEach { level ->
             drawLine(gridColor, Offset(left, y(level)), Offset(right, y(level)), 1.dp.toPx())
         }
 
@@ -268,26 +286,28 @@ private fun LeapIntensityCanvas(
             cornerRadius = CornerRadius(1.dp.toPx()),
         )
 
-        developmentLeaps.forEach { leap ->
-            val px = x((leap.peakWeek * 7).toFloat())
+        peaks.forEach { (leap, day) ->
+            val px = x(day.toFloat())
             if (leap.number == selectedLeapNumber) {
-                drawCircle(curveColor.copy(alpha = .25f), 8.dp.toPx(), Offset(px, y(1f)))
+                drawCircle(curveColor.copy(alpha = .25f), 9.dp.toPx(), Offset(px, y(1f)))
             }
-            drawCircle(surfaceColor, 4.5.dp.toPx(), Offset(px, y(1f)))
-            drawCircle(curveColor, 3.dp.toPx(), Offset(px, y(1f)))
+            drawCircle(surfaceColor, 5.dp.toPx(), Offset(px, y(1f)))
+            drawCircle(curveColor, 3.2.dp.toPx(), Offset(px, y(1f)))
         }
 
-        todayWeek?.let { week ->
-            val tx = x(week * 7f)
-            drawLine(
-                todayColor,
-                Offset(tx, top),
-                Offset(tx, bottom),
-                2.dp.toPx(),
-                cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
-            )
-        }
+        val todayDay = ChronoUnit.DAYS.between(windowStart, today).toInt()
+        val todayX = x(todayDay.toFloat())
+        val todayY = y(points.getOrNull(todayDay)?.second ?: 0f)
+        drawLine(
+            todayColor,
+            Offset(todayX, top),
+            Offset(todayX, bottom),
+            2.dp.toPx(),
+            cap = StrokeCap.Round,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())),
+        )
+        drawCircle(surfaceColor, 4.5.dp.toPx(), Offset(todayX, todayY))
+        drawCircle(todayColor, 3.dp.toPx(), Offset(todayX, todayY))
 
         val weekPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = labelColor.toArgb()
@@ -296,7 +316,7 @@ private fun LeapIntensityCanvas(
         }
         val leapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = curveColor.toArgb()
-            textSize = 9.sp.toPx()
+            textSize = 10.sp.toPx()
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
         }
@@ -307,20 +327,18 @@ private fun LeapIntensityCanvas(
             typeface = Typeface.DEFAULT_BOLD
         }
         drawContext.canvas.nativeCanvas.apply {
-            for (week in 0..TOTAL_WEEKS step 8) {
-                drawText("$week", x((week * 7).toFloat()), bottom + 15.dp.toPx(), weekPaint)
+            weekTicks.forEach { (week, day) ->
+                drawText("$week", x(day.toFloat()), bottom + 15.dp.toPx(), weekPaint)
             }
-            developmentLeaps.forEach { leap ->
-                drawText("${leap.peakWeek}", x((leap.peakWeek * 7).toFloat()), top - 10.dp.toPx(), leapPaint)
+            peaks.forEach { (leap, day) ->
+                drawText("${leap.peakWeek} нед", x(day.toFloat()), top - 10.dp.toPx(), leapPaint)
             }
             weekPaint.textAlign = Paint.Align.RIGHT
             drawText("беспокойно", right - 2.dp.toPx(), top + 11.dp.toPx(), weekPaint)
             weekPaint.textAlign = Paint.Align.LEFT
             drawText("спокойно", left + 2.dp.toPx(), bottom - 6.dp.toPx(), weekPaint)
-            todayWeek?.let { week ->
-                val labelX = x(week * 7f).coerceIn(left + 34.dp.toPx(), right - 34.dp.toPx())
-                drawText("сегодня · ${week.toInt()} нед", labelX, bottom + 28.dp.toPx(), todayPaint)
-            }
+            val todayLabelX = todayX.coerceIn(left + 26.dp.toPx(), right - 26.dp.toPx())
+            drawText("сегодня", todayLabelX, bottom + 28.dp.toPx(), todayPaint)
         }
     }
 }
