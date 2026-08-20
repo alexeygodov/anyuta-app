@@ -438,4 +438,5 @@ internal fun popularMilkAmounts(days: Collection<DayRecord>, feedingName: String
         )
         .take(limit)
         .map { it.key }
+        .sorted()
 }

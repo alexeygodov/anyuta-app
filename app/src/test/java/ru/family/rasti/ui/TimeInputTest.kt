@@ -41,7 +41,7 @@ class TimeInputTest {
     }
 
     @Test
-    fun popularMilkAmounts_returns_most_frequent_first() {
+    fun popularMilkAmounts_picks_most_frequent_sorted_ascending() {
         val updatedAt = "2026-08-19T20:00:00+04:00"
         val days = listOf(
             DayRecord(
@@ -62,7 +62,7 @@ class TimeInputTest {
                 ),
             ),
         )
-        assertEquals(listOf(120, 90, 150, 60), popularMilkAmounts(days, "Молоко"))
+        assertEquals(listOf(60, 90, 120, 150), popularMilkAmounts(days, "Молоко"))
         assertEquals(listOf(200), popularMilkAmounts(days, "Смесь"))
         assertEquals(emptyList<Int>(), popularMilkAmounts(days, "Каша"))
     }
