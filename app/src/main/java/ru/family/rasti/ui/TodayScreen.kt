@@ -1,8 +1,10 @@
 package ru.family.rasti.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,11 +34,14 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +53,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.DayRecord
@@ -319,6 +328,15 @@ private fun MilkProgressCard(
         colors = CardDefaults.cardColors(containerColor = cardColor),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            var minuteTick by remember { mutableStateOf(0) }
+            LaunchedEffect(Unit) {
+                while (true) {
+                    delay(60_000)
+                    minuteTick++
+                }
+            }
+            val lastFeeding = remember(minuteTick, date, day) { lastFeedingInfo(date, milkEntries) }
+            lastFeeding?.let { LastFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
                 Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
@@ -330,7 +348,6 @@ private fun MilkProgressCard(
             } else {
                 Text("Учтено: ${formatNumber(consumed)} мл")
             }
-            lastFeedingText(date, milkEntries)?.let { Text(it, fontWeight = FontWeight.Medium) }
             Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(guide, milkEntries)
             if (milkEntries.isEmpty()) {
@@ -340,27 +357,39 @@ private fun MilkProgressCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (guide != null) {
-                Text(
-                    "Цветная полоса — расчётный диапазон за сутки; тёмная линия — накопительно смесь + молоко по времени.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            } else {
-                Text(
-                    "Тёмная линия — смесь + молоко по времени. Цветной диапазон появится после заполнения даты рождения и веса.",
-                    style = MaterialTheme.typography.bodySmall,
+            var detailsExpanded by rememberSaveable { mutableStateOf(false) }
+            TextButton(onClick = { detailsExpanded = !detailsExpanded }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (detailsExpanded) "Скрыть подробности" else "Подробности и ориентиры")
+                Icon(
+                    if (detailsExpanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = null,
                 )
             }
-            Text(result.explanation, style = MaterialTheme.typography.bodySmall)
-            Text(
-                "Суммируются смесь и измеренное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            AnimatedVisibility(visible = detailsExpanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (guide != null) {
+                        Text(
+                            "Цветная полоса — расчётный диапазон за сутки; тёмная линия — накопительно смесь + молоко по времени.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        Text(
+                            "Тёмная линия — смесь + молоко по времени. Цветной диапазон появится после заполнения даты рождения и веса.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "Суммируются смесь и измеренное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             OutlinedButton(onClick = onMeasurement, modifier = Modifier.fillMaxWidth()) { Text("Ввести рост / вес") }
         }
     }
@@ -459,29 +488,46 @@ private fun isVitaminD(entry: VitaminEntry): Boolean {
     return normalized.contains("витамин d") || normalized.contains("витамин д") || normalized.contains("d3")
 }
 
-private fun lastFeedingText(date: LocalDate, milkEntries: List<FoodEntry>): String? {
+private data class LastFeedingInfo(val text: String, val minutesAgo: Long?)
+
+private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): LastFeedingInfo? {
     val last = milkEntries
-        .mapNotNull { entry -> runCatching { LocalTime.parse(entry.time) }.getOrNull()?.let { it to entry } }
-        .maxByOrNull { it.first }
-        ?.second
+        .mapNotNull { entry -> runCatching { LocalTime.parse(entry.time) }.getOrNull() }
+        .maxOrNull()
         ?: return null
-    val ago = if (date == LocalDate.now()) {
-        runCatching { LocalTime.parse(last.time) }.getOrNull()?.let { time ->
-            val minutes = java.time.Duration.between(time, LocalTime.now()).toMinutes()
-            when {
-                minutes < 0 -> null
-                minutes < 1 -> "только что"
-                minutes < 60 -> "$minutes мин назад"
-                else -> {
-                    val rest = minutes % 60
-                    if (rest == 0L) "${minutes / 60} ч назад" else "${minutes / 60} ч $rest мин назад"
-                }
-            }
-        }
+    val minutesAgo = if (date == LocalDate.now()) {
+        java.time.Duration.between(last, LocalTime.now()).toMinutes().takeIf { it >= 0 }
     } else {
         null
     }
-    return "Последнее питание: ${last.time}" + (ago?.let { " · $it" } ?: "")
+    val ago = when {
+        minutesAgo == null -> null
+        minutesAgo < 1 -> "только что"
+        minutesAgo < 60 -> "$minutesAgo мин назад"
+        else -> {
+            val rest = minutesAgo % 60
+            if (rest == 0L) "${minutesAgo / 60} ч назад" else "${minutesAgo / 60} ч $rest мин назад"
+        }
+    }
+    val timeText = last.format(DateTimeFormatter.ofPattern("HH:mm"))
+    return LastFeedingInfo("Последнее питание: $timeText" + (ago?.let { " · $it" } ?: ""), minutesAgo)
+}
+
+@Composable
+private fun LastFeedingLabel(info: LastFeedingInfo) {
+    val minutes = info.minutesAgo
+    val escalation = when {
+        minutes == null || minutes < 120 -> 0f
+        minutes < 180 -> (minutes - 120).toFloat() / 60f
+        else -> 1f
+    }
+    val animatedEscalation by animateFloatAsState(escalation, label = "last-feeding-attention")
+    Text(
+        text = info.text,
+        color = lerp(LocalContentColor.current, MaterialTheme.colorScheme.error, animatedEscalation),
+        fontSize = (15f + 6f * animatedEscalation).sp,
+        fontWeight = if (animatedEscalation >= 1f) FontWeight.Bold else FontWeight.Medium,
+    )
 }
 
 internal fun formatNumber(number: Double): String =
