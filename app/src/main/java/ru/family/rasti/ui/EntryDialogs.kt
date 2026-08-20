@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,7 +41,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.FoodEntry
@@ -96,25 +94,11 @@ internal fun FoodEditorDialog(
                     Text(fixedName)
                 }
                 if (usesMilkSlider) {
-                    Text(
-                        "${milkAmount.roundToInt()} мл",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
+                    BottleAmountPicker(
+                        amountMl = milkAmount,
+                        onAmountChange = { milkAmount = normalizeMilkAmount(it) },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Slider(
-                        value = milkAmount,
-                        onValueChange = { milkAmount = normalizeMilkAmount(it) },
-                        valueRange = 5f..300f,
-                        steps = 58,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("5 мл", style = MaterialTheme.typography.bodySmall)
-                        Text("Шаг 5 мл", style = MaterialTheme.typography.bodySmall)
-                        Text("300 мл", style = MaterialTheme.typography.bodySmall)
-                    }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
@@ -470,4 +454,4 @@ internal fun adjustTimeInput(value: String, minutes: Long): String {
 }
 
 internal fun normalizeMilkAmount(value: Float): Float =
-    ((value / 5f).roundToInt() * 5f).coerceIn(5f, 300f)
+    ((value / 5f).roundToInt() * 5f).coerceIn(0f, 200f)
