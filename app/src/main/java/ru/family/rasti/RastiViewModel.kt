@@ -23,6 +23,9 @@ import ru.family.rasti.data.VaccinationEntry
 import ru.family.rasti.data.VaccinationStatus
 import ru.family.rasti.data.day
 import ru.family.rasti.data.updateDay
+import ru.family.rasti.notify.AppVisibility
+import ru.family.rasti.notify.ReminderNotifier
+import ru.family.rasti.notify.collectSyncUpdates
 import ru.family.rasti.sync.GitHubSync
 import ru.family.rasti.sync.decodeSyncState
 import ru.family.rasti.sync.encodeSyncState
@@ -31,7 +34,10 @@ import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
-class RastiViewModel(private val store: LocalStore) : ViewModel() {
+class RastiViewModel(
+    private val store: LocalStore,
+    private val notifier: ReminderNotifier? = null,
+) : ViewModel() {
     var data by mutableStateOf(store.loadData())
         private set
     var githubConfig by mutableStateOf(store.loadGitHubConfig())
@@ -333,11 +339,17 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
             runCatching {
                 withContext(Dispatchers.IO) { syncer.sync(activeConfig, snapshot, activeState) }
             }.onSuccess { result ->
-                data = syncer.merge(data, result.data)
+                val merged = syncer.merge(data, result.data)
+                val updates = collectSyncUpdates(data, merged, LocalDate.now())
+                data = merged
                 persist(syncAfter = false)
                 val encodedState = encodeSyncState(result.state)
                 syncState = encodedState
                 store.saveSyncState(encodedState)
+                notifier?.markSyncedNow()
+                if (updates.isNotEmpty() && !AppVisibility.inForeground) {
+                    notifier?.notifySyncUpdates(updates)
+                }
                 if (showStatus) {
                     statusMessage = "Готово: получено ${result.downloadedFiles}, отправлено ${result.uploadedFiles}"
                 }
@@ -374,9 +386,12 @@ class RastiViewModel(private val store: LocalStore) : ViewModel() {
     private fun hasSyncConfig(config: GitHubConfig): Boolean =
         config.owner.isNotBlank() && config.repo.isNotBlank() && config.token.isNotBlank()
 
-    class Factory(private val store: LocalStore) : ViewModelProvider.Factory {
+    class Factory(
+        private val store: LocalStore,
+        private val notifier: ReminderNotifier? = null,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            RastiViewModel(store) as T
+            RastiViewModel(store, notifier) as T
     }
 }

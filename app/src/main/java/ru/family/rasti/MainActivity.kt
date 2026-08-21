@@ -8,6 +8,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.family.rasti.data.LocalStore
+import ru.family.rasti.notify.AppVisibility
+import ru.family.rasti.notify.ReminderNotifier
 import ru.family.rasti.notify.ReminderScheduler
 import ru.family.rasti.ui.RastiApp
 import ru.family.rasti.ui.theme.RastiTheme
@@ -23,10 +25,23 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             RastiTheme {
-                val viewModel: RastiViewModel = viewModel(factory = RastiViewModel.Factory(LocalStore(this)))
+                val viewModel: RastiViewModel = viewModel(
+                    factory = RastiViewModel.Factory(LocalStore(this), ReminderNotifier(applicationContext)),
+                )
                 RastiApp(viewModel)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppVisibility.inForeground = true
+        ReminderNotifier(applicationContext).clearAll()
+    }
+
+    override fun onStop() {
+        AppVisibility.inForeground = false
+        super.onStop()
     }
 }
 
