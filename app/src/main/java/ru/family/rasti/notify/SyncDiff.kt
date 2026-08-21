@@ -4,9 +4,9 @@ import ru.family.rasti.data.AppData
 import ru.family.rasti.data.displayDose
 import java.time.LocalDate
 
-internal data class SyncUpdate(val title: String, val text: String)
+data class SyncUpdate(val title: String, val text: String)
 
-internal fun collectSyncUpdates(before: AppData, after: AppData, today: LocalDate): List<SyncUpdate> {
+fun collectSyncUpdates(before: AppData, after: AppData, today: LocalDate): List<SyncUpdate> {
     val updates = mutableListOf<SyncUpdate>()
     listOf(today, today.minusDays(1)).forEach { date ->
         val beforeDay = before.days[date.toString()]
