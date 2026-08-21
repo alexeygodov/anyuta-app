@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,9 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.AppData
@@ -88,6 +92,25 @@ private data class MeasurementEditorState(
 @Composable
 fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var selectedDateRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    var lastSeenTodayRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        fun followNewDay() {
+            val today = LocalDate.now()
+            val previousToday = LocalDate.parse(lastSeenTodayRaw)
+            if (today == previousToday) return
+            if (LocalDate.parse(selectedDateRaw) == previousToday) {
+                selectedDateRaw = today.toString()
+            }
+            lastSeenTodayRaw = today.toString()
+        }
+        followNewDay()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) followNewDay()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val selectedDate = LocalDate.parse(selectedDateRaw)
     val day = viewModel.day(selectedDate)
     val vitaminD = day.vitamins.firstOrNull(::isVitaminD)
