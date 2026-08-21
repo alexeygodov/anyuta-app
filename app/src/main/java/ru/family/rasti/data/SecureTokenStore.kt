@@ -11,9 +11,12 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class SecureTokenStore(private val context: Context) {
-    private val preferences = context.getSharedPreferences("github_secret", Context.MODE_PRIVATE)
-    private val alias = "rasti.github.token"
+class SecureTokenStore(
+    private val context: Context,
+    prefsName: String = "github_secret",
+    private val alias: String = "rasti.github.token",
+) {
+    private val preferences = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     fun save(token: String) {
         if (token.isBlank()) {

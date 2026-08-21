@@ -77,6 +77,14 @@ data class GitHubConfig(
     val token: String = "",
 )
 
+data class MaxConfig(
+    val enabled: Boolean = false,
+    val token: String = "",
+    val chatId: String = "",
+) {
+    fun isConfigured(): Boolean = enabled && token.isNotBlank() && chatId.toLongOrNull() != null
+}
+
 fun AppData.day(date: LocalDate): DayRecord =
     days[date.toString()] ?: DayRecord(date = date.toString())
 

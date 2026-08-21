@@ -22,8 +22,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +45,8 @@ import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.ChildSex
 import ru.family.rasti.data.GitHubConfig
+import ru.family.rasti.data.MaxConfig
+import ru.family.rasti.max.MaxChat
 import ru.family.rasti.update.AppUpdater
 import ru.family.rasti.update.UpdateInfo
 import java.io.File
@@ -77,6 +81,14 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var updateBusy by remember { mutableStateOf(false) }
     var updateMessage by remember { mutableStateOf("Можно проверить новую версию в GitHub Releases.") }
     var downloadedApkPath by remember { mutableStateOf<String?>(null) }
+
+    val currentMax = viewModel.maxConfig
+    var maxEnabled by remember(currentMax) { mutableStateOf(currentMax.enabled) }
+    var maxToken by remember(currentMax) { mutableStateOf(currentMax.token) }
+    var maxChatId by remember(currentMax) { mutableStateOf(currentMax.chatId) }
+    var maxBusy by remember { mutableStateOf(false) }
+    var maxMessage by remember { mutableStateOf<String?>(null) }
+    var maxFoundChats by remember { mutableStateOf<List<MaxChat>>(emptyList()) }
 
     val config = GitHubConfig(owner.trim(), repo.trim(), branch.trim(), token.trim())
     val tokenOwner = owner.trim().ifBlank { "alexeygodov" }
@@ -219,6 +231,92 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 )
                 Text(
                     "После сохранения синхронизация идёт автоматически: при запуске, каждую минуту, после ввода данных и при переключении вкладок.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            SettingsCard("Уведомления в MAX") {
+                Text(
+                    "Приложение может слать в семейный чат MAX: новые кормления, приём витамина D, " +
+                        "напоминания (3 часа без кормления, полдень без витамина) и итог дня в 21:00.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (maxEnabled) "Отправка включена" else "Отправка выключена",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(checked = maxEnabled, onCheckedChange = { maxEnabled = it })
+                }
+                Text(
+                    "1. Создайте бота через Masterbot в MAX и скопируйте токен. " +
+                        "2. Добавьте бота в семейный чат и сделайте администратором. " +
+                        "3. Напишите в чат любое сообщение и нажмите «Найти чат».",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedTextField(
+                    maxToken,
+                    { maxToken = it },
+                    label = { Text("Токен бота MAX") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    maxChatId,
+                    { maxChatId = it.filter { ch -> ch.isDigit() } },
+                    label = { Text("ID чата") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedButton(
+                    onClick = {
+                        maxBusy = true
+                        maxMessage = null
+                        viewModel.findMaxChats(maxToken) { chats, error ->
+                            maxBusy = false
+                            if (chats != null) {
+                                maxFoundChats = chats
+                                if (chats.size == 1) maxChatId = chats[0].id.toString()
+                                maxMessage = if (chats.isEmpty()) {
+                                    "Чаты не найдены. Напишите любое сообщение в чате с ботом и попробуйте снова."
+                                } else {
+                                    "Найдено чатов: ${chats.size} — выберите ниже."
+                                }
+                            } else {
+                                maxMessage = error
+                            }
+                        }
+                    },
+                    enabled = !maxBusy && maxToken.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (maxBusy) "Поиск…" else "Найти чат") }
+                maxFoundChats.forEach { chat ->
+                    AssistChip(
+                        onClick = { maxChatId = chat.id.toString() },
+                        label = { Text("${chat.title} (${chat.id})") },
+                    )
+                }
+                Button(
+                    onClick = {
+                        val config = MaxConfig(maxEnabled, maxToken.trim(), maxChatId.trim())
+                        viewModel.saveMaxConfig(config)
+                        maxBusy = true
+                        maxMessage = null
+                        viewModel.testMaxConnection(config) { ok, message ->
+                            maxBusy = false
+                            maxMessage = (if (ok) "✅ " else "⚠️ ") + message
+                        }
+                    },
+                    enabled = !maxBusy && maxToken.isNotBlank() && maxChatId.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(if (maxBusy) "Проверка…" else "Сохранить и проверить") }
+                maxMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Text(
+                    "События с этого телефона отправит в чат второй телефон после синхронизации — " +
+                        "поэтому настройте MAX на обоих устройствах.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

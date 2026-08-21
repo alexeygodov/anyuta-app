@@ -9,6 +9,7 @@ class LocalStore(private val context: Context) {
     private val syncStateFile = File(context.filesDir, "rasti-sync-state.json")
     private val settings = context.getSharedPreferences("github_settings", Context.MODE_PRIVATE)
     private val tokenStore = SecureTokenStore(context)
+    private val maxTokenStore = SecureTokenStore(context, "max_secret", "rasti.max.token")
 
     fun loadData(): AppData = runCatching {
         if (!dataFile.exists()) AppData() else JsonCodec.decodeAppData(dataFile.readText())
@@ -50,5 +51,19 @@ class LocalStore(private val context: Context) {
             putString("branch", config.branch.trim().ifBlank { "main" })
         }
         tokenStore.save(config.token.trim())
+    }
+
+    fun loadMaxConfig(): MaxConfig = MaxConfig(
+        enabled = settings.getBoolean("max_enabled", false),
+        token = maxTokenStore.load(),
+        chatId = settings.getString("max_chat_id", "") ?: "",
+    )
+
+    fun saveMaxConfig(config: MaxConfig) {
+        settings.edit {
+            putBoolean("max_enabled", config.enabled)
+            putString("max_chat_id", config.chatId.trim())
+        }
+        maxTokenStore.save(config.token.trim())
     }
 }

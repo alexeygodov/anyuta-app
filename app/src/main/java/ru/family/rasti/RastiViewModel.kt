@@ -21,9 +21,13 @@ import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
 import ru.family.rasti.data.VaccinationStatus
+import ru.family.rasti.data.MaxConfig
 import ru.family.rasti.data.day
 import ru.family.rasti.data.updateDay
+import ru.family.rasti.max.MaxBotApi
+import ru.family.rasti.max.MaxChat
 import ru.family.rasti.notify.AppVisibility
+import ru.family.rasti.notify.MaxMessenger
 import ru.family.rasti.notify.ReminderNotifier
 import ru.family.rasti.notify.collectSyncUpdates
 import ru.family.rasti.sync.GitHubSync
@@ -37,10 +41,13 @@ import java.time.format.DateTimeFormatter
 class RastiViewModel(
     private val store: LocalStore,
     private val notifier: ReminderNotifier? = null,
+    private val maxMessenger: MaxMessenger? = null,
 ) : ViewModel() {
     var data by mutableStateOf(store.loadData())
         private set
     var githubConfig by mutableStateOf(store.loadGitHubConfig())
+        private set
+    var maxConfig by mutableStateOf(store.loadMaxConfig())
         private set
     var syncing by mutableStateOf(false)
         private set
@@ -350,6 +357,10 @@ class RastiViewModel(
                 if (updates.isNotEmpty() && !AppVisibility.inForeground) {
                     notifier?.notifySyncUpdates(updates)
                 }
+                val max = maxMessenger
+                if (updates.isNotEmpty() && max != null && max.isConfigured()) {
+                    withContext(Dispatchers.IO) { runCatching { max.announceEvents(updates) } }
+                }
                 if (showStatus) {
                     statusMessage = "Готово: получено ${result.downloadedFiles}, отправлено ${result.uploadedFiles}"
                 }
@@ -366,6 +377,37 @@ class RastiViewModel(
 
     fun syncIfConfigured(showStatus: Boolean = false) {
         if (hasSyncConfig(githubConfig)) sync(githubConfig, showStatus)
+    }
+
+    fun saveMaxConfig(config: MaxConfig) {
+        maxConfig = config
+        store.saveMaxConfig(config)
+    }
+
+    fun testMaxConnection(config: MaxConfig, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val (ok, message) = withContext(Dispatchers.IO) {
+                runCatching {
+                    val api = MaxBotApi(config.token.trim())
+                    val name = api.getMe()
+                    val chatId = config.chatId.trim().toLongOrNull()
+                        ?: return@runCatching false to "Бот «$name» найден, но ID чата не похож на число"
+                    api.sendMessage(chatId, "✅ Анюта подключена к этому чату")
+                    true to "Бот «$name» найден, тестовое сообщение отправлено"
+                }.getOrElse { false to (it.message ?: "Ошибка подключения") }
+            }
+            onResult(ok, message)
+        }
+    }
+
+    fun findMaxChats(token: String, onResult: (List<MaxChat>?, String) -> Unit) {
+        viewModelScope.launch {
+            val (chats, error) = withContext(Dispatchers.IO) {
+                runCatching { MaxBotApi(token.trim()).findChats() }
+                    .fold({ it to "" }, { null to (it.message ?: "Ошибка запроса") })
+            }
+            onResult(chats, error)
+        }
     }
 
     fun clearStatus() {
@@ -389,9 +431,10 @@ class RastiViewModel(
     class Factory(
         private val store: LocalStore,
         private val notifier: ReminderNotifier? = null,
+        private val maxMessenger: MaxMessenger? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            RastiViewModel(store, notifier) as T
+            RastiViewModel(store, notifier, maxMessenger) as T
     }
 }

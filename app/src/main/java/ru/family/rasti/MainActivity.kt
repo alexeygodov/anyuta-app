@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.viewmodel.compose.viewModel
 import ru.family.rasti.data.LocalStore
 import ru.family.rasti.notify.AppVisibility
+import ru.family.rasti.notify.MaxMessenger
 import ru.family.rasti.notify.ReminderNotifier
 import ru.family.rasti.notify.ReminderScheduler
 import ru.family.rasti.ui.RastiApp
@@ -26,7 +27,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             RastiTheme {
                 val viewModel: RastiViewModel = viewModel(
-                    factory = RastiViewModel.Factory(LocalStore(this), ReminderNotifier(applicationContext)),
+                    factory = RastiViewModel.Factory(
+                        LocalStore(this),
+                        ReminderNotifier(applicationContext),
+                        MaxMessenger(applicationContext),
+                    ),
                 )
                 RastiApp(viewModel)
             }
