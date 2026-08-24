@@ -146,6 +146,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 day = day,
                 onFormula = { foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь") },
                 onMilk = { foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко") },
+                onEditFood = { foodEditor = FoodEditorState(selectedDate, it) },
                 onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
             )
         }
@@ -327,6 +328,7 @@ private fun MilkProgressCard(
     day: DayRecord,
     onFormula: () -> Unit,
     onMilk: () -> Unit,
+    onEditFood: (FoodEntry) -> Unit,
     onMeasurement: () -> Unit,
 ) {
     val milkEntries = day.food
@@ -366,11 +368,11 @@ private fun MilkProgressCard(
             } else {
                 Text("Учтено: ${formatNumber(consumed)} мл")
             }
-            Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MilkIntakeChart(guide, milkEntries, date)
+            Text("Кормления за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            MilkIntakeChart(milkEntries, date, onEntryClick = onEditFood)
             if (milkEntries.isEmpty()) {
                 Text(
-                    "Нажмите «Смесь» или «Молоко» — здесь появится линия накопленного объёма.",
+                    "Нажмите «Смесь» или «Молоко» — здесь появится лента кормлений.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -387,7 +389,7 @@ private fun MilkProgressCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (guide != null) {
                         Text(
-                            "Цветная полоса — расчётный диапазон за сутки; тёмная линия — накопительно смесь + молоко по времени.",
+                            "Прогресс сверху показывает приближение к суточной норме. Столбики — отдельные кормления: высота означает объём, цвет — молоко или смесь.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
@@ -396,7 +398,7 @@ private fun MilkProgressCard(
                         )
                     } else {
                         Text(
-                            "Тёмная линия — смесь + молоко по времени. Цветной диапазон появится после заполнения даты рождения и веса.",
+                            "Столбики показывают кормления по времени и объёму. Суточная норма появится после заполнения даты рождения и веса.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
