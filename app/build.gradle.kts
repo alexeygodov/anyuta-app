@@ -20,8 +20,8 @@ android {
         applicationId = "ru.family.rasti"
         minSdk = 26
         targetSdk = 37
-        versionCode = 19
-        versionName = "0.6.1"
+        versionCode = 20
+        versionName = "0.6.2"
     }
 
     if (keystorePropertiesFile.exists()) {

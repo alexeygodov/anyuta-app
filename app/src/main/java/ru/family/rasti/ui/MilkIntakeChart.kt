@@ -25,13 +25,13 @@ import ru.family.rasti.feeding.MilkGuide
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.ceil
 import kotlin.math.max
 
 private data class IntakePoint(
     val minute: Int,
     val totalMl: Float,
     val amountMl: Float,
-    val label: String,
     val isMilk: Boolean,
 )
 
@@ -52,13 +52,22 @@ internal fun MilkIntakeChart(
     val formulaColor = MaterialTheme.colorScheme.secondary
     val points = cumulativePoints(entries)
     val consumed = points.lastOrNull()?.totalMl ?: 0f
+    val milkTotal = points.filter(IntakePoint::isMilk).sumOf { it.amountMl.toDouble() }
+    val formulaTotal = points.filterNot(IntakePoint::isMilk).sumOf { it.amountMl.toDouble() }
+    val isToday = date == LocalDate.now()
+    val nowMinute = if (isToday) LocalTime.now().toSecondOfDay() / 60 else null
 
-    Canvas(Modifier.fillMaxWidth().height(248.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(278.dp)) {
         val left = 40.dp.toPx()
         val right = size.width - 8.dp.toPx()
         val top = 22.dp.toPx()
-        val bottom = size.height - 28.dp.toPx()
+        val bottom = size.height - 66.dp.toPx()
         val maxY = max(max(guide?.maximumMl?.toFloat() ?: 0f, consumed), 500f) * 1.12f
+        val chartEndMinute = if (nowMinute != null) {
+            max(nowMinute, points.lastOrNull()?.minute ?: 0)
+        } else {
+            1440
+        }
 
         fun x(minute: Int): Float = left + minute.coerceIn(0, 1440) / 1440f * (right - left)
         fun y(value: Float): Float = bottom - value.coerceAtLeast(0f) / maxY * (bottom - top)
@@ -107,8 +116,7 @@ internal fun MilkIntakeChart(
             cap = StrokeCap.Round,
         )
 
-        if (date == LocalDate.now()) {
-            val nowMinute = LocalTime.now().toSecondOfDay() / 60
+        if (nowMinute != null) {
             val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
             drawLine(
                 color = nowLineColor.copy(alpha = .7f),
@@ -129,11 +137,11 @@ internal fun MilkIntakeChart(
                     lineTo(x(point.minute), y(point.totalMl))
                     previousTotal = point.totalMl
                 }
-                lineTo(x(1440), y(previousTotal))
+                lineTo(x(chartEndMinute), y(previousTotal))
             }
             val areaPath = Path().apply {
                 addPath(linePath)
-                lineTo(x(1440), bottom)
+                lineTo(x(chartEndMinute), bottom)
                 lineTo(x(0), bottom)
                 close()
             }
@@ -186,46 +194,99 @@ internal fun MilkIntakeChart(
                 drawText(label, labelX, size.height - 8.dp.toPx(), paint)
             }
             drawText("мл", 2.dp.toPx(), top, paint)
-            if (date == LocalDate.now()) {
+            if (nowMinute != null) {
                 val nowLabel = "сейчас"
-                val nowX = x(LocalTime.now().toSecondOfDay() / 60)
+                val nowX = x(nowMinute)
                 val labelX = (nowX - paint.measureText(nowLabel) / 2)
                     .coerceIn(left, right - paint.measureText(nowLabel))
                 drawText(nowLabel, labelX, top - 6.dp.toPx(), paint)
             }
-            points.forEachIndexed { index, point ->
+
+            val labelIndexes = pointLabelIndexes(points.size)
+            val occupied = mutableListOf<RectF>()
+            val labelRects = mutableMapOf<Int, RectF>()
+            val placementOrder = buildList {
+                labelIndexes.lastOrNull()?.let(::add)
+                addAll(labelIndexes.dropLast(1))
+            }.distinct()
+            placementOrder.forEach { index ->
+                val point = points[index]
                 val centerX = x(point.minute)
                 val centerY = y(point.totalMl)
-                val chipText = "${point.label} ${formatNumber(point.amountMl.toDouble())}"
-                val paddingX = 8.dp.toPx()
-                val chipHeight = 18.dp.toPx()
+                val chipText = "${if (point.isMilk) "М" else "С"} ${formatNumber(point.amountMl.toDouble())}"
+                val paddingX = 7.dp.toPx()
+                val chipHeight = 17.dp.toPx()
                 val textWidth = chipTextPaint.measureText(chipText)
                 val chipWidth = textWidth + paddingX * 2
-                val desiredY = centerY - 26.dp.toPx() - if (index % 2 == 0) 0f else 20.dp.toPx()
-                val chipLeft = (centerX - chipWidth / 2).coerceIn(left, right - chipWidth)
-                val chipTop = desiredY.coerceAtLeast(top)
+                val baseLeft = (centerX - chipWidth / 2).coerceIn(left, right - chipWidth)
+                val verticalCandidates = listOf(
+                    centerY - chipHeight - 8.dp.toPx(),
+                    centerY + 8.dp.toPx(),
+                    centerY - chipHeight - 29.dp.toPx(),
+                    centerY + 29.dp.toPx(),
+                )
+                val horizontalOffsets = listOf(0f, -chipWidth * .55f, chipWidth * .55f)
+                val chosen = verticalCandidates.firstNotNullOfOrNull { candidateTop ->
+                    horizontalOffsets.firstNotNullOfOrNull { offsetX ->
+                        val chipLeft = (baseLeft + offsetX).coerceIn(left, right - chipWidth)
+                        val chipTop = candidateTop.coerceIn(top, bottom - chipHeight)
+                        val candidate = RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight)
+                        val padded = RectF(candidate).apply { inset(-3.dp.toPx(), -3.dp.toPx()) }
+                        candidate.takeIf { rect -> occupied.none { RectF.intersects(it, padded) } }
+                    }
+                }
+                if (chosen != null) {
+                    labelRects[index] = chosen
+                    occupied += RectF(chosen).apply { inset(-3.dp.toPx(), -3.dp.toPx()) }
+                }
+            }
+            labelIndexes.forEach { index ->
+                val point = points[index]
+                val rect = labelRects[index] ?: return@forEach
+                val chipText = "${if (point.isMilk) "М" else "С"} ${formatNumber(point.amountMl.toDouble())}"
                 chipFillPaint.color = if (point.isMilk) milkColor.copy(alpha = .92f).toArgb() else formulaColor.copy(alpha = .9f).toArgb()
                 drawRoundRect(
-                    RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight),
+                    rect,
                     9.dp.toPx(),
                     9.dp.toPx(),
                     chipFillPaint,
                 )
                 drawText(
                     chipText,
-                    chipLeft + chipWidth / 2,
-                    chipTop + chipHeight / 2 + chipTextPaint.textSize / 2.9f,
+                    rect.centerX(),
+                    rect.centerY() + chipTextPaint.textSize / 2.9f,
                     chipTextPaint,
                 )
             }
-            val legendTop = bottom + 18.dp.toPx()
+
+            val legendTop = bottom + 49.dp.toPx()
+            val milkText = "Молоко ${formatNumber(milkTotal)} мл"
+            val formulaText = "Смесь ${formatNumber(formulaTotal)} мл"
+            val dotSize = 8.dp.toPx()
+            val dotGap = 7.dp.toPx()
+            val groupGap = 18.dp.toPx()
+            val milkWidth = dotSize + dotGap + paint.measureText(milkText)
+            val formulaWidth = dotSize + dotGap + paint.measureText(formulaText)
+            val legendWidth = milkWidth + groupGap + formulaWidth
+            val legendLeft = (left + (right - left - legendWidth) / 2).coerceAtLeast(left)
             chipFillPaint.color = milkColor.toArgb()
-            drawCircle(left + 10.dp.toPx(), legendTop - 4.dp.toPx(), 4.dp.toPx(), chipFillPaint)
-            drawText("Молоко", left + 20.dp.toPx(), legendTop, paint)
+            drawCircle(legendLeft + dotSize / 2, legendTop - 4.dp.toPx(), dotSize / 2, chipFillPaint)
+            drawText(milkText, legendLeft + dotSize + dotGap, legendTop, paint)
+            val formulaLeft = legendLeft + milkWidth + groupGap
             chipFillPaint.color = formulaColor.toArgb()
-            drawCircle(left + 88.dp.toPx(), legendTop - 4.dp.toPx(), 4.dp.toPx(), chipFillPaint)
-            drawText("Смесь", left + 98.dp.toPx(), legendTop, paint)
+            drawCircle(formulaLeft + dotSize / 2, legendTop - 4.dp.toPx(), dotSize / 2, chipFillPaint)
+            drawText(formulaText, formulaLeft + dotSize + dotGap, legendTop, paint)
         }
+    }
+}
+
+internal fun pointLabelIndexes(pointCount: Int, maximumLabels: Int = 8): List<Int> {
+    if (pointCount <= 0 || maximumLabels <= 0) return emptyList()
+    if (pointCount <= maximumLabels) return (0 until pointCount).toList()
+    val step = ceil(pointCount / maximumLabels.toFloat()).toInt()
+    return buildList {
+        for (index in 0 until pointCount step step) add(index)
+        if (lastOrNull() != pointCount - 1) add(pointCount - 1)
     }
 }
 
@@ -242,7 +303,6 @@ private fun cumulativePoints(entries: List<FoodEntry>): List<IntakePoint> {
                 minute = minute,
                 totalMl = total,
                 amountMl = amount,
-                label = if (name.equals("Молоко", ignoreCase = true)) "Молоко" else "Смесь",
                 isMilk = name.equals("Молоко", ignoreCase = true),
             )
         }
