@@ -1,28 +1,31 @@
 package ru.family.rasti.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MilkIntakeChartTest {
 
     @Test
-    fun labels_all_points_when_day_is_not_dense() {
-        assertEquals((0..5).toList(), pointLabelIndexes(pointCount = 6))
+    fun scale_includes_daily_guide_with_headroom() {
+        assertEquals(1200f, feedingChartScaleMaximum(totalMl = 495.0, guideMaximumMl = 1060))
     }
 
     @Test
-    fun labels_are_thinned_and_keep_last_point_when_day_is_dense() {
-        val indexes = pointLabelIndexes(pointCount = 17)
-
-        assertTrue(indexes.size <= 8)
-        assertEquals(0, indexes.first())
-        assertEquals(16, indexes.last())
-        assertEquals(indexes.distinct(), indexes)
+    fun scale_expands_when_actual_total_exceeds_guide() {
+        assertTrue(feedingChartScaleMaximum(totalMl = 1300.0, guideMaximumMl = 1060) >= 1500f)
     }
 
     @Test
-    fun labels_are_empty_without_points() {
-        assertEquals(emptyList<Int>(), pointLabelIndexes(pointCount = 0))
+    fun progress_uses_target_and_may_exceed_one_hundred_percent() {
+        assertEquals(53, feedingProgressPercent(totalMl = 495.0, targetMl = 930))
+        assertEquals(108, feedingProgressPercent(totalMl = 1000.0, targetMl = 930))
+    }
+
+    @Test
+    fun progress_is_absent_without_valid_target() {
+        assertNull(feedingProgressPercent(totalMl = 495.0, targetMl = null))
+        assertNull(feedingProgressPercent(totalMl = 495.0, targetMl = 0))
     }
 }

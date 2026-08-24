@@ -368,11 +368,18 @@ private fun MilkProgressCard(
             } else {
                 Text("Учтено: ${formatNumber(consumed)} мл")
             }
-            Text("Кормления за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MilkIntakeChart(milkEntries, date, onEntryClick = onEditFood)
+            Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            MilkIntakeChart(
+                entries = milkEntries,
+                date = date,
+                minimumMl = guide?.minimumMl,
+                targetMl = guide?.targetMl,
+                maximumMl = guide?.maximumMl,
+                onEntryClick = onEditFood,
+            )
             if (milkEntries.isEmpty()) {
                 Text(
-                    "Нажмите «Смесь» или «Молоко» — здесь появится лента кормлений.",
+                    "Нажмите «Смесь» или «Молоко» — здесь появится график накопления.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -389,7 +396,7 @@ private fun MilkProgressCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (guide != null) {
                         Text(
-                            "Прогресс сверху показывает приближение к суточной норме. Столбики — отдельные кормления: высота означает объём, цвет — молоко или смесь.",
+                            "Ступеньки показывают накопленный объём. Цвет вертикального скачка означает молоко или смесь, а полупрозрачная полоса — мягкий ориентир темпа к суточному диапазону.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(

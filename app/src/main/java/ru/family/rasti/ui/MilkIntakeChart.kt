@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,8 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.nativeCanvas
@@ -47,11 +44,13 @@ import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 private data class FeedingPoint(
     val entry: FoodEntry,
     val minute: Int,
     val amountMl: Float,
+    val cumulativeMl: Float,
     val isMilk: Boolean,
 )
 
@@ -59,32 +58,56 @@ private data class FeedingPoint(
 internal fun MilkIntakeChart(
     entries: List<FoodEntry>,
     date: LocalDate,
+    minimumMl: Int?,
+    targetMl: Int?,
+    maximumMl: Int?,
     onEntryClick: (FoodEntry) -> Unit,
 ) {
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
-    val onMilkColor = MaterialTheme.colorScheme.onPrimary
-    val onFormulaColor = MaterialTheme.colorScheme.onSecondary
+    val paceColor = MaterialTheme.colorScheme.tertiary
+    val actualColor = MaterialTheme.colorScheme.onSurface
     val outlineColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
     val plotColor = MaterialTheme.colorScheme.surfaceVariant
     val nowColor = MaterialTheme.colorScheme.error
     val points = remember(entries) { feedingPoints(entries) }
+    val total = points.lastOrNull()?.cumulativeMl ?: 0f
     val milkTotal = points.filter(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
     val formulaTotal = points.filterNot(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
+    val progressPercent = feedingProgressPercent(total.toDouble(), targetMl)
+    val scaleMaximum = feedingChartScaleMaximum(total.toDouble(), maximumMl)
     val nowMinute = if (date == LocalDate.now()) LocalTime.now().toSecondOfDay() / 60 else null
+    val endMinute = max(points.lastOrNull()?.minute ?: 0, nowMinute ?: 1440).coerceAtMost(1440)
     val density = LocalDensity.current
-    val leftTapPadding = with(density) { 36.dp.toPx() }
+    val leftTapPadding = with(density) { 42.dp.toPx() }
     val rightTapPadding = with(density) { 8.dp.toPx() }
     val tapRadius = with(density) { 28.dp.toPx() }
     var chartWidth by remember { mutableFloatStateOf(0f) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Накопление", style = MaterialTheme.typography.labelLarge)
+            Text(
+                if (minimumMl != null && maximumMl != null) {
+                    "ориентир $minimumMl–$maximumMl мл"
+                } else {
+                    "за сутки"
+                },
+                color = labelColor,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(242.dp)
+                .height(232.dp)
                 .onSizeChanged { chartWidth = it.width.toFloat() }
                 .pointerInput(points, chartWidth) {
                     detectTapGestures { tap ->
@@ -98,91 +121,108 @@ internal fun MilkIntakeChart(
                     }
                 },
         ) {
-            val left = 36.dp.toPx()
+            val left = 42.dp.toPx()
             val right = size.width - 8.dp.toPx()
-            val top = 34.dp.toPx()
-            val bottom = size.height - 30.dp.toPx()
-            val rawMaximum = points.maxOfOrNull(FeedingPoint::amountMl) ?: 0f
-            val maximumMl = max(200f, ceil(rawMaximum / 50f) * 50f)
-            val barWidth = if (points.size <= 8) 12.dp.toPx() else 8.dp.toPx()
+            val top = 16.dp.toPx()
+            val bottom = size.height - 28.dp.toPx()
+            val chartHeight = bottom - top
 
             fun x(minute: Int): Float = left + minute.coerceIn(0, 1440) / 1440f * (right - left)
-            fun y(amountMl: Float): Float = bottom - amountMl.coerceAtLeast(0f) / maximumMl * (bottom - top)
+            fun y(amountMl: Float): Float = bottom - amountMl.coerceIn(0f, scaleMaximum) / scaleMaximum * chartHeight
 
             drawRoundRect(
                 color = plotColor.copy(alpha = .16f),
                 topLeft = Offset(left, top),
-                size = Size(right - left, bottom - top),
-                cornerRadius = CornerRadius(18.dp.toPx()),
+                size = Size(right - left, chartHeight),
+                cornerRadius = CornerRadius(16.dp.toPx()),
             )
 
-            if (nowMinute != null) {
-                val nowX = x(nowMinute)
-                drawRoundRect(
-                    color = surfaceColor.copy(alpha = .32f),
-                    topLeft = Offset(nowX, top),
-                    size = Size((right - nowX).coerceAtLeast(0f), bottom - top),
-                    cornerRadius = CornerRadius(18.dp.toPx()),
-                )
-            }
-
-            listOf(.25f, .5f, .75f, 1f).forEach { fraction ->
-                val gridY = bottom - (bottom - top) * fraction
+            val tickValues = listOf(0f, scaleMaximum / 2f, scaleMaximum)
+            tickValues.forEach { value ->
                 drawLine(
-                    outlineColor.copy(alpha = if (fraction == 1f) .18f else .1f),
-                    Offset(left, gridY),
-                    Offset(right, gridY),
-                    1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 9f)),
+                    outlineColor.copy(alpha = if (value == 0f) .3f else .13f),
+                    Offset(left, y(value)),
+                    Offset(right, y(value)),
+                    if (value == 0f) 1.2.dp.toPx() else 1.dp.toPx(),
+                    cap = StrokeCap.Round,
                 )
             }
             listOf(0, 360, 720, 1080, 1440).forEach { minute ->
                 drawLine(
-                    outlineColor.copy(alpha = .09f),
+                    outlineColor.copy(alpha = .08f),
                     Offset(x(minute), top),
                     Offset(x(minute), bottom),
                     1.dp.toPx(),
                 )
             }
-            drawLine(
-                outlineColor.copy(alpha = .4f),
-                Offset(left, bottom),
-                Offset(right, bottom),
-                1.2.dp.toPx(),
-                cap = StrokeCap.Round,
-            )
+
+            if (minimumMl != null && targetMl != null && maximumMl != null) {
+                val paceBand = Path().apply {
+                    moveTo(x(0), y(0f))
+                    lineTo(x(1440), y(maximumMl.toFloat()))
+                    lineTo(x(1440), y(minimumMl.toFloat()))
+                    close()
+                }
+                drawPath(paceBand, paceColor.copy(alpha = .13f))
+                drawLine(
+                    paceColor.copy(alpha = .72f),
+                    Offset(x(0), y(0f)),
+                    Offset(x(1440), y(targetMl.toFloat())),
+                    1.4.dp.toPx(),
+                    cap = StrokeCap.Round,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 8f)),
+                )
+            }
 
             if (nowMinute != null) {
                 drawLine(
                     nowColor.copy(alpha = .72f),
                     Offset(x(nowMinute), top),
                     Offset(x(nowMinute), bottom),
-                    1.5.dp.toPx(),
+                    1.4.dp.toPx(),
                     cap = StrokeCap.Round,
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f, 7f)),
                 )
             }
 
+            var previousMinute = 0
+            var previousTotal = 0f
             points.forEach { point ->
-                val centerX = x(point.minute)
-                val barTop = y(point.amountMl).coerceAtMost(bottom - 5.dp.toPx())
                 val eventColor = if (point.isMilk) milkColor else formulaColor
-                drawRoundRect(
-                    color = eventColor.copy(alpha = .13f),
-                    topLeft = Offset(centerX - barWidth / 2 - 3.dp.toPx(), barTop - 2.dp.toPx()),
-                    size = Size(barWidth + 6.dp.toPx(), bottom - barTop + 2.dp.toPx()),
-                    cornerRadius = CornerRadius((barWidth + 6.dp.toPx()) / 2),
+                drawLine(
+                    actualColor.copy(alpha = .78f),
+                    Offset(x(previousMinute), y(previousTotal)),
+                    Offset(x(point.minute), y(previousTotal)),
+                    2.4.dp.toPx(),
+                    cap = StrokeCap.Round,
                 )
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        0f to eventColor,
-                        1f to eventColor.copy(alpha = .7f),
-                        startY = barTop,
-                        endY = bottom,
-                    ),
-                    topLeft = Offset(centerX - barWidth / 2, barTop),
-                    size = Size(barWidth, bottom - barTop),
-                    cornerRadius = CornerRadius(barWidth / 2),
+                drawLine(
+                    eventColor,
+                    Offset(x(point.minute), y(previousTotal)),
+                    Offset(x(point.minute), y(point.cumulativeMl)),
+                    5.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+                drawCircle(
+                    color = surfaceColor,
+                    radius = 5.2.dp.toPx(),
+                    center = Offset(x(point.minute), y(point.cumulativeMl)),
+                )
+                drawCircle(
+                    color = eventColor,
+                    radius = 3.4.dp.toPx(),
+                    center = Offset(x(point.minute), y(point.cumulativeMl)),
+                )
+                previousMinute = point.minute
+                previousTotal = point.cumulativeMl
+            }
+            if (points.isNotEmpty()) {
+                drawLine(
+                    actualColor.copy(alpha = .78f),
+                    Offset(x(previousMinute), y(previousTotal)),
+                    Offset(x(endMinute), y(previousTotal)),
+                    2.4.dp.toPx(),
+                    cap = StrokeCap.Round,
                 )
             }
 
@@ -190,97 +230,69 @@ internal fun MilkIntakeChart(
                 color = labelColor.toArgb()
                 textSize = 10.dp.toPx()
             }
-            val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = 10.dp.toPx()
-                textAlign = Paint.Align.CENTER
-                isFakeBoldText = true
-            }
-            val valueFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            val labelIndexes = pointLabelIndexes(points.size, maximumLabels = 9)
-            val occupied = mutableListOf<RectF>()
-            val labelRects = mutableMapOf<Int, RectF>()
-            val placementOrder = buildList {
-                labelIndexes.lastOrNull()?.let(::add)
-                addAll(labelIndexes.dropLast(1))
-            }.distinct()
-            placementOrder.forEach { index ->
-                val point = points[index]
-                val text = formatNumber(point.amountMl.toDouble())
-                val textWidth = valuePaint.measureText(text)
-                val chipWidth = textWidth + 15.dp.toPx()
-                val chipHeight = 20.dp.toPx()
-                val baseLeft = (x(point.minute) - chipWidth / 2).coerceIn(left, right - chipWidth)
-                val barTop = y(point.amountMl)
-                val verticalCandidates = listOf(
-                    barTop - chipHeight - 7.dp.toPx(),
-                    barTop - chipHeight - 30.dp.toPx(),
-                    barTop + 7.dp.toPx(),
-                )
-                val horizontalOffsets = listOf(0f, -chipWidth * .55f, chipWidth * .55f)
-                val chosen = verticalCandidates.firstNotNullOfOrNull { candidateTop ->
-                    horizontalOffsets.firstNotNullOfOrNull { offsetX ->
-                        val chipLeft = (baseLeft + offsetX).coerceIn(left, right - chipWidth)
-                        val chipTop = candidateTop.coerceIn(top, bottom - chipHeight)
-                        val candidate = RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight)
-                        val padded = RectF(candidate).apply { inset(-3.dp.toPx(), -3.dp.toPx()) }
-                        candidate.takeIf { occupied.none { previous -> RectF.intersects(previous, padded) } }
-                    }
-                }
-                if (chosen != null) {
-                    labelRects[index] = chosen
-                    occupied += RectF(chosen).apply { inset(-3.dp.toPx(), -3.dp.toPx()) }
-                }
-            }
-
             drawContext.canvas.nativeCanvas.apply {
-                drawText(formatNumber(maximumMl.toDouble()), 2.dp.toPx(), top + 4.dp.toPx(), axisPaint)
-                drawText(formatNumber((maximumMl / 2).toDouble()), 2.dp.toPx(), y(maximumMl / 2) + 4.dp.toPx(), axisPaint)
+                tickValues.forEach { value ->
+                    val label = formatNumber(value.toDouble())
+                    drawText(label, left - axisPaint.measureText(label) - 7.dp.toPx(), y(value) + 4.dp.toPx(), axisPaint)
+                }
                 listOf(0 to "0", 360 to "6", 720 to "12", 1080 to "18", 1440 to "24").forEach { (minute, label) ->
                     val labelX = (x(minute) - axisPaint.measureText(label) / 2)
                         .coerceIn(left, right - axisPaint.measureText(label))
-                    drawText(label, labelX, size.height - 8.dp.toPx(), axisPaint)
+                    drawText(label, labelX, size.height - 7.dp.toPx(), axisPaint)
                 }
-                drawText("мл", 2.dp.toPx(), top - 10.dp.toPx(), axisPaint)
-                if (nowMinute != null) {
-                    val text = "сейчас"
-                    val labelX = (x(nowMinute) - axisPaint.measureText(text) / 2)
-                        .coerceIn(left, right - axisPaint.measureText(text))
-                    drawText(text, labelX, top - 8.dp.toPx(), axisPaint)
+                drawText("мл", 2.dp.toPx(), top + 4.dp.toPx(), axisPaint)
+            }
+
+            if (points.isNotEmpty()) {
+                val endpointText = buildString {
+                    append(formatNumber(total.toDouble()))
+                    append(" мл")
+                    progressPercent?.let { append(" · $it%") }
                 }
-                labelIndexes.forEach { index ->
-                    val point = points[index]
-                    val rect = labelRects[index] ?: return@forEach
-                    val eventColor = if (point.isMilk) milkColor else formulaColor
-                    valueFillPaint.color = labelColor.copy(alpha = .12f).toArgb()
-                    val shadow = RectF(rect).apply { offset(0f, 2.dp.toPx()) }
-                    drawRoundRect(shadow, 11.dp.toPx(), 11.dp.toPx(), valueFillPaint)
-                    valueFillPaint.color = eventColor.toArgb()
-                    drawRoundRect(rect, 11.dp.toPx(), 11.dp.toPx(), valueFillPaint)
-                    valuePaint.color = if (point.isMilk) onMilkColor.toArgb() else onFormulaColor.toArgb()
-                    drawText(
-                        formatNumber(point.amountMl.toDouble()),
-                        rect.centerX(),
-                        rect.centerY() + valuePaint.textSize / 2.9f,
-                        valuePaint,
-                    )
+                val endpointPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = actualColor.toArgb()
+                    textSize = 11.dp.toPx()
+                    isFakeBoldText = true
                 }
+                val horizontalPadding = 9.dp.toPx()
+                val chipWidth = endpointPaint.measureText(endpointText) + horizontalPadding * 2
+                val chipHeight = 25.dp.toPx()
+                val anchorX = x(endMinute)
+                val anchorY = y(total)
+                val chipLeft = (anchorX + 7.dp.toPx()).coerceIn(left, right - chipWidth)
+                val chipTop = (anchorY - chipHeight - 7.dp.toPx()).coerceIn(top, bottom - chipHeight)
+                val chip = RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight)
+                drawRoundRect(
+                    color = surfaceColor.copy(alpha = .95f),
+                    topLeft = Offset(chip.left, chip.top),
+                    size = Size(chip.width(), chip.height()),
+                    cornerRadius = CornerRadius(chipHeight / 2),
+                )
+                drawContext.canvas.nativeCanvas.drawText(
+                    endpointText,
+                    chip.left + horizontalPadding,
+                    chip.centerY() + endpointPaint.textSize / 2.9f,
+                    endpointPaint,
+                )
             }
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FeedingLegendChip(milkColor, "Молоко", milkTotal)
-            Box(Modifier.width(8.dp))
-            FeedingLegendChip(formulaColor, "Смесь", formulaTotal)
+            FeedingLegendItem(milkColor, "Молоко", milkTotal)
+            FeedingLegendItem(formulaColor, "Смесь", formulaTotal)
+            if (minimumMl != null && maximumMl != null) {
+                FeedingLegendItem(paceColor, "Ориентир", null)
+            }
         }
         if (points.isNotEmpty()) {
             Text(
-                "Нажмите на столбик, чтобы изменить кормление",
+                "Нажмите на точку, чтобы изменить кормление",
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = labelColor,
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -288,46 +300,49 @@ internal fun MilkIntakeChart(
 }
 
 @Composable
-private fun FeedingLegendChip(color: Color, label: String, amountMl: Double) {
-    Surface(
-        color = color.copy(alpha = .14f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(50),
+private fun FeedingLegendItem(color: Color, label: String, amountMl: Double?) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-        ) {
-            Box(Modifier.size(8.dp).background(color, CircleShape))
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(
-                "${formatNumber(amountMl)} мл",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        Box(Modifier.size(8.dp).background(color, CircleShape))
+        Text(
+            buildString {
+                append(label)
+                amountMl?.let { append(" ${formatNumber(it)}") }
+            },
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (amountMl != null) FontWeight.Medium else FontWeight.Normal,
+        )
     }
 }
 
-internal fun pointLabelIndexes(pointCount: Int, maximumLabels: Int = 8): List<Int> {
-    if (pointCount <= 0 || maximumLabels <= 0) return emptyList()
-    if (pointCount <= maximumLabels) return (0 until pointCount).toList()
-    val step = ceil(pointCount / maximumLabels.toFloat()).toInt()
-    return buildList {
-        for (index in 0 until pointCount step step) add(index)
-        if (lastOrNull() != pointCount - 1) add(pointCount - 1)
-    }
+internal fun feedingChartScaleMaximum(totalMl: Double, guideMaximumMl: Int?): Float {
+    val guideBasis = guideMaximumMl?.toDouble()?.times(1.06) ?: 0.0
+    val actualBasis = totalMl.coerceAtLeast(0.0) * 1.14
+    val basis = max(200.0, max(guideBasis, actualBasis))
+    return (ceil(basis / 100.0) * 100.0).toFloat()
 }
 
-private fun feedingPoints(entries: List<FoodEntry>): List<FeedingPoint> =
-    entries.mapNotNull { entry ->
+internal fun feedingProgressPercent(totalMl: Double, targetMl: Int?): Int? {
+    if (targetMl == null || targetMl <= 0) return null
+    return (totalMl.coerceAtLeast(0.0) / targetMl * 100.0).roundToInt()
+}
+
+private fun feedingPoints(entries: List<FoodEntry>): List<FeedingPoint> {
+    var cumulative = 0f
+    return entries.mapNotNull { entry ->
         val time = runCatching { LocalTime.parse(entry.time, DateTimeFormatter.ofPattern("HH:mm")) }.getOrNull()
             ?: return@mapNotNull null
+        Triple(entry, time.toSecondOfDay() / 60, entry.amount.toFloat().coerceAtLeast(0f))
+    }.sortedBy { it.second }.map { (entry, minute, amount) ->
+        cumulative += amount
         FeedingPoint(
             entry = entry,
-            minute = time.toSecondOfDay() / 60,
-            amountMl = entry.amount.toFloat(),
+            minute = minute,
+            amountMl = amount,
+            cumulativeMl = cumulative,
             isMilk = entry.name.equals("Молоко", ignoreCase = true),
         )
-    }.sortedBy(FeedingPoint::minute)
+    }
+}
