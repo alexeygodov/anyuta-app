@@ -33,7 +33,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -361,13 +360,6 @@ private fun MilkProgressCard(
                 Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
                 Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
             }
-            if (guide != null) {
-                val progress = (consumed / guide.targetMl).toFloat().coerceIn(0f, 1f)
-                Text("${formatNumber(consumed)} из ≈${guide.targetMl} мл")
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-            } else {
-                Text("Учтено: ${formatNumber(consumed)} мл")
-            }
             Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(
                 entries = milkEntries,
@@ -379,7 +371,7 @@ private fun MilkProgressCard(
             )
             if (milkEntries.isEmpty()) {
                 Text(
-                    "Нажмите «Смесь» или «Молоко» — здесь появится график накопления.",
+                    "Нажмите «Смесь» или «Молоко» — здесь появится лента кормлений.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -396,7 +388,7 @@ private fun MilkProgressCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (guide != null) {
                         Text(
-                            "Ступеньки показывают накопленный объём. Цвет вертикального скачка означает молоко или смесь, а полупрозрачная полоса — мягкий ориентир темпа к суточному диапазону.",
+                            "Верхняя шкала сравнивает общий объём с суточным диапазоном и показывает доли молока и смеси. Нижние столбики — отдельные кормления по времени и объёму.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
