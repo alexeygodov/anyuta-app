@@ -371,7 +371,7 @@ private fun MilkProgressCard(
             )
             if (milkEntries.isEmpty()) {
                 Text(
-                    "Нажмите «Смесь» или «Молоко» — здесь появится лента кормлений.",
+                    "Нажмите «Смесь» или «Молоко» — здесь появится накопительный график.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -388,7 +388,7 @@ private fun MilkProgressCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (guide != null) {
                         Text(
-                            "Верхняя шкала сравнивает общий объём с суточным диапазоном и показывает доли молока и смеси. Нижние столбики — отдельные кормления по времени и объёму.",
+                            "График показывает накопленный объём за сутки. Вертикальная зона справа — суточный диапазон, круг внутри неё — цель. Круглые маркеры означают молоко, квадратные — смесь.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
