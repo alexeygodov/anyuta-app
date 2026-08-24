@@ -47,6 +47,7 @@ internal fun MilkIntakeChart(
     val outlineColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val nowLineColor = MaterialTheme.colorScheme.error
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
     val points = cumulativePoints(entries)
@@ -110,7 +111,7 @@ internal fun MilkIntakeChart(
             val nowMinute = LocalTime.now().toSecondOfDay() / 60
             val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
             drawLine(
-                color = MaterialTheme.colorScheme.error.copy(alpha = .7f),
+                color = nowLineColor.copy(alpha = .7f),
                 start = Offset(x(nowMinute), top),
                 end = Offset(x(nowMinute), bottom),
                 strokeWidth = 1.6.dp.toPx(),
