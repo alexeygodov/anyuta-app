@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.BuildConfig
 import ru.family.rasti.RastiViewModel
+import ru.family.rasti.data.AppTheme
 import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.ChildSex
 import ru.family.rasti.data.GitHubConfig
@@ -113,6 +114,32 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     ) {
         item {
             Text("Настройки", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+        }
+        item {
+            SettingsCard("Оформление") {
+                Text(
+                    "Выберите тему — она применяется сразу и сохраняется только на этом телефоне.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    FilterChip(
+                        selected = viewModel.appTheme == AppTheme.LIGHT,
+                        onClick = { viewModel.selectAppTheme(AppTheme.LIGHT) },
+                        label = { Text("Светлая") },
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilterChip(
+                        selected = viewModel.appTheme == AppTheme.DARK,
+                        onClick = { viewModel.selectAppTheme(AppTheme.DARK) },
+                        label = { Text("Тёмная") },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
         item {
             SettingsCard("Профиль ребёнка") {

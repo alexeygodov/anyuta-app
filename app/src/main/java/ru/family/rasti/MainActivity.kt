@@ -6,7 +6,12 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import ru.family.rasti.data.AppTheme
 import ru.family.rasti.data.LocalStore
 import ru.family.rasti.notify.AppVisibility
 import ru.family.rasti.notify.MaxMessenger
@@ -25,14 +30,26 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         }
         setContent {
-            RastiTheme {
-                val viewModel: RastiViewModel = viewModel(
-                    factory = RastiViewModel.Factory(
-                        LocalStore(this),
-                        ReminderNotifier(applicationContext),
-                        MaxMessenger(applicationContext),
-                    ),
-                )
+            val viewModel: RastiViewModel = viewModel(
+                factory = RastiViewModel.Factory(
+                    LocalStore(this),
+                    ReminderNotifier(applicationContext),
+                    MaxMessenger(applicationContext),
+                ),
+            )
+            val darkTheme = viewModel.appTheme == AppTheme.DARK
+            RastiTheme(darkTheme = darkTheme) {
+                val systemBarColor = MaterialTheme.colorScheme.background.toArgb()
+                SideEffect {
+                    @Suppress("DEPRECATION")
+                    window.statusBarColor = systemBarColor
+                    @Suppress("DEPRECATION")
+                    window.navigationBarColor = systemBarColor
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                    }
+                }
                 RastiApp(viewModel)
             }
         }
@@ -49,4 +66,3 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 }
-

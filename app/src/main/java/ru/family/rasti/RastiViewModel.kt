@@ -12,6 +12,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.family.rasti.data.AppData
+import ru.family.rasti.data.AppTheme
 import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
@@ -48,6 +49,8 @@ class RastiViewModel(
     var githubConfig by mutableStateOf(store.loadGitHubConfig())
         private set
     var maxConfig by mutableStateOf(store.loadMaxConfig())
+        private set
+    var appTheme by mutableStateOf(store.loadAppTheme())
         private set
     var syncing by mutableStateOf(false)
         private set
@@ -382,6 +385,11 @@ class RastiViewModel(
     fun saveMaxConfig(config: MaxConfig) {
         maxConfig = config
         store.saveMaxConfig(config)
+    }
+
+    fun selectAppTheme(theme: AppTheme) {
+        appTheme = theme
+        store.saveAppTheme(theme)
     }
 
     fun testMaxConnection(config: MaxConfig, onResult: (Boolean, String) -> Unit) {

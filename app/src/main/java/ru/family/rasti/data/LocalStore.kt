@@ -66,4 +66,10 @@ class LocalStore(private val context: Context) {
         }
         maxTokenStore.save(config.token.trim())
     }
+
+    fun loadAppTheme(): AppTheme = parseAppTheme(settings.getString("app_theme", null))
+
+    fun saveAppTheme(theme: AppTheme) {
+        settings.edit { putString("app_theme", theme.name) }
+    }
 }
