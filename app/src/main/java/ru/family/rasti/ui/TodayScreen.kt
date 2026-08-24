@@ -367,7 +367,7 @@ private fun MilkProgressCard(
                 Text("Учтено: ${formatNumber(consumed)} мл")
             }
             Text("График за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            MilkIntakeChart(guide, milkEntries)
+            MilkIntakeChart(guide, milkEntries, date)
             if (milkEntries.isEmpty()) {
                 Text(
                     "Нажмите «Смесь» или «Молоко» — здесь появится линия накопленного объёма.",
@@ -509,10 +509,14 @@ private fun isVitaminD(entry: VitaminEntry): Boolean {
 private data class LastFeedingInfo(val text: String, val minutesAgo: Long?)
 
 private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): LastFeedingInfo? {
-    val last = milkEntries
-        .mapNotNull { entry -> runCatching { LocalTime.parse(entry.time) }.getOrNull() }
-        .maxOrNull()
+    val lastEntry = milkEntries
+        .mapNotNull { entry ->
+            runCatching { LocalTime.parse(entry.time) }.getOrNull()?.let { time -> time to entry }
+        }
+        .maxByOrNull { it.first }
         ?: return null
+    val last = lastEntry.first
+    val entry = lastEntry.second
     val minutesAgo = if (date == LocalDate.now()) {
         java.time.Duration.between(last, LocalTime.now()).toMinutes().takeIf { it >= 0 }
     } else {
@@ -528,10 +532,11 @@ private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): Last
         }
     }
     val timeText = last.format(DateTimeFormatter.ofPattern("HH:mm"))
+    val amountText = "${entry.name} ${formatNumber(entry.amount)} ${entry.unit}"
     val text = if (ago != null) {
-        "$ago, последнее кормление в $timeText"
+        "$ago, $amountText в $timeText"
     } else {
-        "Последнее кормление в $timeText"
+        "$amountText в $timeText"
     }
     return LastFeedingInfo(text, minutesAgo)
 }

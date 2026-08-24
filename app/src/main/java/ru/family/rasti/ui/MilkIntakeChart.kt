@@ -1,6 +1,7 @@
 package ru.family.rasti.ui
 
 import android.graphics.Paint
+import android.graphics.RectF
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,27 +22,40 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.feeding.MilkGuide
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
 
-private data class IntakePoint(val minute: Int, val totalMl: Float)
+private data class IntakePoint(
+    val minute: Int,
+    val totalMl: Float,
+    val amountMl: Float,
+    val label: String,
+    val isMilk: Boolean,
+)
 
 @Composable
-internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
+internal fun MilkIntakeChart(
+    guide: MilkGuide?,
+    entries: List<FoodEntry>,
+    date: LocalDate,
+) {
     val actualColor = MaterialTheme.colorScheme.primary
     val rangeColor = MaterialTheme.colorScheme.tertiaryContainer
     val rangeLineColor = MaterialTheme.colorScheme.tertiary
     val outlineColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val milkColor = MaterialTheme.colorScheme.primary
+    val formulaColor = MaterialTheme.colorScheme.secondary
     val points = cumulativePoints(entries)
     val consumed = points.lastOrNull()?.totalMl ?: 0f
 
-    Canvas(Modifier.fillMaxWidth().height(205.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(248.dp)) {
         val left = 40.dp.toPx()
         val right = size.width - 8.dp.toPx()
-        val top = 14.dp.toPx()
+        val top = 22.dp.toPx()
         val bottom = size.height - 28.dp.toPx()
         val maxY = max(max(guide?.maximumMl?.toFloat() ?: 0f, consumed), 500f) * 1.12f
 
@@ -92,6 +106,19 @@ internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
             cap = StrokeCap.Round,
         )
 
+        if (date == LocalDate.now()) {
+            val nowMinute = LocalTime.now().toSecondOfDay() / 60
+            val dash = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
+            drawLine(
+                color = MaterialTheme.colorScheme.error.copy(alpha = .7f),
+                start = Offset(x(nowMinute), top),
+                end = Offset(x(nowMinute), bottom),
+                strokeWidth = 1.6.dp.toPx(),
+                cap = StrokeCap.Round,
+                pathEffect = dash,
+            )
+        }
+
         if (points.isNotEmpty()) {
             val linePath = Path().apply {
                 moveTo(x(0), y(0f))
@@ -125,12 +152,13 @@ internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
             )
             points.forEachIndexed { index, point ->
                 val center = Offset(x(point.minute), y(point.totalMl))
+                val eventColor = if (point.isMilk) milkColor else formulaColor
                 if (index == points.lastIndex) {
                     drawCircle(actualColor.copy(alpha = .18f), 11.dp.toPx(), center)
-                    drawCircle(actualColor, 6.5.dp.toPx(), center)
+                    drawCircle(eventColor, 6.5.dp.toPx(), center)
                     drawCircle(surfaceColor, 3.dp.toPx(), center)
                 } else {
-                    drawCircle(actualColor, 5.dp.toPx(), center)
+                    drawCircle(eventColor, 5.dp.toPx(), center)
                     drawCircle(surfaceColor, 2.4.dp.toPx(), center)
                 }
             }
@@ -140,6 +168,13 @@ internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
             color = labelColor.toArgb()
             textSize = 10.5.dp.toPx()
         }
+        val chipTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = surfaceColor.toArgb()
+            textSize = 9.5.dp.toPx()
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        val chipFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
         drawContext.canvas.nativeCanvas.apply {
             if (guide != null && bandTop != null && bandBottom != null) {
                 drawText("${guide.maximumMl}", 2.dp.toPx(), bandTop + 4.dp.toPx(), paint)
@@ -150,6 +185,45 @@ internal fun MilkIntakeChart(guide: MilkGuide?, entries: List<FoodEntry>) {
                 drawText(label, labelX, size.height - 8.dp.toPx(), paint)
             }
             drawText("мл", 2.dp.toPx(), top, paint)
+            if (date == LocalDate.now()) {
+                val nowLabel = "сейчас"
+                val nowX = x(LocalTime.now().toSecondOfDay() / 60)
+                val labelX = (nowX - paint.measureText(nowLabel) / 2)
+                    .coerceIn(left, right - paint.measureText(nowLabel))
+                drawText(nowLabel, labelX, top - 6.dp.toPx(), paint)
+            }
+            points.forEachIndexed { index, point ->
+                val centerX = x(point.minute)
+                val centerY = y(point.totalMl)
+                val chipText = "${point.label} ${formatNumber(point.amountMl.toDouble())}"
+                val paddingX = 8.dp.toPx()
+                val chipHeight = 18.dp.toPx()
+                val textWidth = chipTextPaint.measureText(chipText)
+                val chipWidth = textWidth + paddingX * 2
+                val desiredY = centerY - 26.dp.toPx() - if (index % 2 == 0) 0f else 20.dp.toPx()
+                val chipLeft = (centerX - chipWidth / 2).coerceIn(left, right - chipWidth)
+                val chipTop = desiredY.coerceAtLeast(top)
+                chipFillPaint.color = if (point.isMilk) milkColor.copy(alpha = .92f).toArgb() else formulaColor.copy(alpha = .9f).toArgb()
+                drawRoundRect(
+                    RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight),
+                    9.dp.toPx(),
+                    9.dp.toPx(),
+                    chipFillPaint,
+                )
+                drawText(
+                    chipText,
+                    chipLeft + chipWidth / 2,
+                    chipTop + chipHeight / 2 + chipTextPaint.textSize / 2.9f,
+                    chipTextPaint,
+                )
+            }
+            val legendTop = bottom + 18.dp.toPx()
+            chipFillPaint.color = milkColor.toArgb()
+            drawCircle(left + 10.dp.toPx(), legendTop - 4.dp.toPx(), 4.dp.toPx(), chipFillPaint)
+            drawText("Молоко", left + 20.dp.toPx(), legendTop, paint)
+            chipFillPaint.color = formulaColor.toArgb()
+            drawCircle(left + 88.dp.toPx(), legendTop - 4.dp.toPx(), 4.dp.toPx(), chipFillPaint)
+            drawText("Смесь", left + 98.dp.toPx(), legendTop, paint)
         }
     }
 }
@@ -159,10 +233,16 @@ private fun cumulativePoints(entries: List<FoodEntry>): List<IntakePoint> {
     return entries.mapNotNull { entry ->
         val time = runCatching { LocalTime.parse(entry.time, DateTimeFormatter.ofPattern("HH:mm")) }.getOrNull()
             ?: return@mapNotNull null
-        time.toSecondOfDay() / 60 to entry.amount.toFloat()
+        Triple(time.toSecondOfDay() / 60, entry.amount.toFloat(), entry.name.trim())
     }.sortedBy { it.first }
-        .map { (minute, amount) ->
+        .map { (minute, amount, name) ->
             total += amount
-            IntakePoint(minute, total)
+            IntakePoint(
+                minute = minute,
+                totalMl = total,
+                amountMl = amount,
+                label = if (name.equals("Молоко", ignoreCase = true)) "Молоко" else "Смесь",
+                isMilk = name.equals("Молоко", ignoreCase = true),
+            )
         }
 }
