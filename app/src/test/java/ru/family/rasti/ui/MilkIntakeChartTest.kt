@@ -22,6 +22,18 @@ class MilkIntakeChartTest {
     }
 
     @Test
+    fun nearby_labels_are_grouped_but_distant_feeds_stay_separate() {
+        assertEquals(
+            listOf(0..1, 2..3, 4..4),
+            feedingLabelGroupRanges(listOf(100, 125, 300, 330, 700), thresholdMinutes = 45),
+        )
+        assertEquals(
+            listOf(0..0, 1..1, 2..2),
+            feedingLabelGroupRanges(listOf(100, 125, 300), thresholdMinutes = 20),
+        )
+    }
+
+    @Test
     fun feeding_count_has_correct_russian_word_form() {
         assertEquals("1 кормление", feedingCountLabel(1))
         assertEquals("3 кормления", feedingCountLabel(3))
