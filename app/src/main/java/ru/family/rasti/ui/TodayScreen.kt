@@ -67,6 +67,7 @@ import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.displayDose
 import ru.family.rasti.feeding.FeedingGuide
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -354,7 +355,9 @@ private fun MilkProgressCard(
                     minuteTick++
                 }
             }
-            val lastFeeding = remember(minuteTick, date, day) { lastFeedingInfo(date, milkEntries) }
+            val lastFeeding = remember(minuteTick, date, data.days) {
+                lastFeedingInfo(date, data.days.values)
+            }
             lastFeeding?.let { LastFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
@@ -392,13 +395,20 @@ private fun MilkProgressCard(
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
-                            "Справочный диапазон: ${guide.minimumMl}–${guide.maximumMl} мл · вес ${formatNumber(guide.weightKg)} кг",
+                            "Норма по времени: ${guide.minimumMl}–${guide.maximumMl} мл/сутки · вес ${formatNumber(guide.weightKg)} кг",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     } else {
                         Text(
                             "Столбики показывают кормления по времени и объёму. Суточная норма появится после заполнения даты рождения и веса.",
                             style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (milkEntries.isNotEmpty()) {
+                        Text(
+                            "Нажмите на маркер, чтобы изменить кормление. График можно увеличить щипком, двигать пальцем и сбросить двойным нажатием.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(result.explanation, style = MaterialTheme.typography.bodySmall)
@@ -507,19 +517,36 @@ private fun isVitaminD(entry: VitaminEntry): Boolean {
     return normalized.contains("витамин d") || normalized.contains("витамин д") || normalized.contains("d3")
 }
 
-private data class LastFeedingInfo(val text: String, val minutesAgo: Long?)
+internal data class LastFeedingInfo(val text: String, val minutesAgo: Long?)
 
-private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): LastFeedingInfo? {
-    val lastEntry = milkEntries
-        .mapNotNull { entry ->
-            runCatching { LocalTime.parse(entry.time) }.getOrNull()?.let { time -> time to entry }
+internal fun lastFeedingInfo(
+    date: LocalDate,
+    days: Collection<DayRecord>,
+    now: LocalDateTime = LocalDateTime.now(),
+): LastFeedingInfo? {
+    val cutoff = if (date == now.toLocalDate()) now else date.atTime(LocalTime.MAX)
+    val lastEntry = days.asSequence()
+        .mapNotNull { record ->
+            runCatching { LocalDate.parse(record.date) }.getOrNull()?.let { recordDate -> recordDate to record }
         }
+        .filter { (recordDate) -> recordDate <= date }
+        .flatMap { (recordDate, record) ->
+            record.food.asSequence()
+                .filter { it.unit.trim().lowercase() in setOf("мл", "ml") }
+                .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
+                .mapNotNull { entry ->
+                    runCatching { LocalTime.parse(entry.time) }.getOrNull()?.let { time ->
+                        recordDate.atTime(time) to entry
+                    }
+                }
+        }
+        .filter { (entryDateTime) -> entryDateTime <= cutoff }
         .maxByOrNull { it.first }
         ?: return null
     val last = lastEntry.first
     val entry = lastEntry.second
-    val minutesAgo = if (date == LocalDate.now()) {
-        java.time.Duration.between(last, LocalTime.now()).toMinutes().takeIf { it >= 0 }
+    val minutesAgo = if (date == now.toLocalDate()) {
+        java.time.Duration.between(last, now).toMinutes().takeIf { it >= 0 }
     } else {
         null
     }
@@ -532,7 +559,7 @@ private fun lastFeedingInfo(date: LocalDate, milkEntries: List<FoodEntry>): Last
             if (rest == 0L) "${minutesAgo / 60} ч назад" else "${minutesAgo / 60} ч $rest мин назад"
         }
     }
-    val timeText = last.format(DateTimeFormatter.ofPattern("HH:mm"))
+    val timeText = last.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))
     val amountText = "${entry.name} ${formatNumber(entry.amount)} ${entry.unit}"
     val text = if (ago != null) {
         "$ago, $amountText в $timeText"

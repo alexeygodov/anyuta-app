@@ -18,9 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -42,6 +40,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -128,8 +128,21 @@ internal fun MilkIntakeChart(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val summaryShape = RoundedCornerShape(16.dp)
+        val summaryProgress = ((progressPercent ?: 0) / 100f).coerceIn(0f, 1f)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(summaryShape)
+                .background(plotColor.copy(alpha = .42f))
+                .drawBehind {
+                    drawRoundRect(
+                        color = milkColor.copy(alpha = .22f),
+                        size = Size(size.width * summaryProgress, size.height),
+                        cornerRadius = CornerRadius(16.dp.toPx()),
+                    )
+                }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -149,44 +162,12 @@ internal fun MilkIntakeChart(
                 )
             }
             progressPercent?.let {
-                Surface(
-                    color = milkColor.copy(alpha = .14f),
-                    contentColor = actualColor,
-                    shape = RoundedCornerShape(50),
-                ) {
-                    Text(
-                        "$it% цели",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                if (minimumMl != null && maximumMl != null) {
-                    "Норма по времени · $minimumMl–$maximumMl мл/сутки"
-                } else {
-                    "Накопление за сутки"
-                },
-                color = labelColor,
-                style = MaterialTheme.typography.labelSmall,
-            )
-            TextButton(
-                onClick = {
-                    if (zoom > 1.01f) {
-                        zoom = 1f
-                        viewportCenter = 720f
-                    }
-                },
-            ) {
-                Text(if (zoom > 1.01f) "${formatNumber(zoom.toDouble())}× · сбросить" else "Щипок — масштаб")
+                Text(
+                    "$it% цели",
+                    color = actualColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
 
@@ -197,16 +178,22 @@ internal fun MilkIntakeChart(
                 .onSizeChanged { chartWidth = it.width.toFloat() }
                 .transformable(transformState)
                 .pointerInput(points, chartWidth, viewportStart, visibleMinutes) {
-                    detectTapGestures { tap ->
-                        val plotWidth = chartWidth - leftTapPadding - rightTapPadding
-                        if (plotWidth <= 0f || points.isEmpty()) return@detectTapGestures
-                        val visiblePoints = points.filter { it.minute in viewportStart.roundToInt()..viewportEnd.roundToInt() }
-                        val nearest = visiblePoints.minByOrNull { point ->
-                            abs(leftTapPadding + (point.minute - viewportStart) / visibleMinutes * plotWidth - tap.x)
-                        } ?: return@detectTapGestures
-                        val nearestX = leftTapPadding + (nearest.minute - viewportStart) / visibleMinutes * plotWidth
-                        if (abs(nearestX - tap.x) <= tapRadius) onEntryClick(nearest.entry)
-                    }
+                    detectTapGestures(
+                        onDoubleTap = {
+                            zoom = 1f
+                            viewportCenter = 720f
+                        },
+                        onTap = { tap ->
+                            val plotWidth = chartWidth - leftTapPadding - rightTapPadding
+                            if (plotWidth <= 0f || points.isEmpty()) return@detectTapGestures
+                            val visiblePoints = points.filter { it.minute in viewportStart.roundToInt()..viewportEnd.roundToInt() }
+                            val nearest = visiblePoints.minByOrNull { point ->
+                                abs(leftTapPadding + (point.minute - viewportStart) / visibleMinutes * plotWidth - tap.x)
+                            } ?: return@detectTapGestures
+                            val nearestX = leftTapPadding + (nearest.minute - viewportStart) / visibleMinutes * plotWidth
+                            if (abs(nearestX - tap.x) <= tapRadius) onEntryClick(nearest.entry)
+                        },
+                    )
                 },
         ) {
             val left = 34.dp.toPx()
@@ -433,7 +420,6 @@ internal fun MilkIntakeChart(
                         .coerceIn(left, right - axisPaint.measureText(label))
                     drawText(label, labelX, size.height - 6.dp.toPx(), axisPaint)
                 }
-                drawText("мл", 1.dp.toPx(), top + 4.dp.toPx(), axisPaint)
             }
         }
 
@@ -445,15 +431,6 @@ internal fun MilkIntakeChart(
             FeedingLegendItem(milkColor, isMilk = true, label = "Молоко ${formatNumber(milkTotal)}")
             FeedingLegendItem(formulaColor, isMilk = false, label = "Смесь ${formatNumber(formulaTotal)}")
             if (targetMl != null) GoalLegendItem(normColor)
-        }
-
-        if (points.isNotEmpty()) {
-            Text(
-                "Нажмите на маркер для изменения · увеличивайте график щипком",
-                modifier = Modifier.fillMaxWidth(),
-                color = labelColor,
-                style = MaterialTheme.typography.labelSmall,
-            )
         }
     }
 }
