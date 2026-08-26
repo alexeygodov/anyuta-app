@@ -331,8 +331,17 @@ private fun VitaminDReminder(
 }
 
 @Composable
-private fun SmartFeedingCard(recommendation: SmartFeedingRecommendation) {
-    val timingText = when (recommendation.moment) {
+private fun SmartFeedingLabel(recommendation: SmartFeedingRecommendation) {
+    Text(
+        text = "Расчётная порция: ${recommendation.amountMl} мл",
+        color = MaterialTheme.colorScheme.primary,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Medium,
+    )
+}
+
+private fun smartFeedingTimingText(recommendation: SmartFeedingRecommendation): String =
+    when (recommendation.moment) {
         FeedingMoment.EARLY -> recommendation.minutesUntilUsual
             ?.takeIf { it > 0 }
             ?.let { "По обычному ритму через ${formatMinutes(it)}" }
@@ -341,36 +350,6 @@ private fun SmartFeedingCard(recommendation: SmartFeedingRecommendation) {
         FeedingMoment.LATER_THAN_USUAL -> "По обычному ритму уже пора"
         FeedingMoment.NO_HISTORY -> "Пока считаю по суточной цели"
     }
-    val goalText = if (recommendation.remainingToTargetMl > 0) {
-        "до цели ${recommendation.remainingToTargetMl} мл"
-    } else {
-        "суточная цель набрана"
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-    ) {
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                "Ориентир сейчас · ≈${recommendation.amountMl} мл",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(timingText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text(
-                "Обычно ${recommendation.usualAmountMl} мл · ритм ${formatMinutes(recommendation.usualIntervalMinutes)} · $goalText",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-            Text(
-                "Не обязательный объём: ориентируйтесь на голод и насыщение ребёнка.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = .78f),
-            )
-        }
-    }
-}
 
 private fun formatMinutes(minutes: Int): String = when {
     minutes < 60 -> "$minutes мин"
@@ -419,19 +398,19 @@ private fun MilkProgressCard(
                 SmartFeedingGuide.calculate(data, date, guide)
             }
             lastFeeding?.let { LastFeedingLabel(it) }
-            smartRecommendation?.let { SmartFeedingCard(it) }
+            smartRecommendation?.let { SmartFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = { onMilk(smartRecommendation?.amountMl) },
                     modifier = Modifier.weight(1f).height(54.dp),
                 ) {
-                    Text(smartRecommendation?.let { "Молоко · ${it.amountMl}" } ?: "Молоко")
+                    Text("Молоко")
                 }
                 Button(
                     onClick = { onFormula(smartRecommendation?.amountMl) },
                     modifier = Modifier.weight(1f).height(54.dp),
                 ) {
-                    Text(smartRecommendation?.let { "Смесь · ${it.amountMl}" } ?: "Смесь")
+                    Text("Смесь")
                 }
             }
             Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -484,8 +463,23 @@ private fun MilkProgressCard(
                     }
                     if (smartRecommendation != null) {
                         Text(
-                            "Умный ориентир учит обычный объём и ритм за 7 дней. Коррекция по суточной цели ограничена, чтобы не «догонять» норму одним большим кормлением.",
+                            buildString {
+                                append("Расчётная порция: ${smartRecommendation.amountMl} мл. ")
+                                append("${smartFeedingTimingText(smartRecommendation)}. ")
+                                append("Обычный объём: ${smartRecommendation.usualAmountMl} мл, ")
+                                append("обычный интервал: ${formatMinutes(smartRecommendation.usualIntervalMinutes)}. ")
+                                if (smartRecommendation.remainingToTargetMl > 0) {
+                                    append("До суточной цели: ${smartRecommendation.remainingToTargetMl} мл.")
+                                } else {
+                                    append("Суточная цель уже набрана.")
+                                }
+                            },
                             style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Расчёт учитывает обычный объём и ритм за 7 дней. Коррекция по суточной цели ограничена, чтобы не «догонять» норму одним большим кормлением. Это ориентир: сигналы голода и насыщения ребёнка важнее числа.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(result.explanation, style = MaterialTheme.typography.bodySmall)
