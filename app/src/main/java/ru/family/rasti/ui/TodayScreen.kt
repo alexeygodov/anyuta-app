@@ -65,7 +65,10 @@ import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.displayDose
+import ru.family.rasti.feeding.FeedingMoment
 import ru.family.rasti.feeding.FeedingGuide
+import ru.family.rasti.feeding.SmartFeedingGuide
+import ru.family.rasti.feeding.SmartFeedingRecommendation
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -76,6 +79,7 @@ private data class FoodEditorState(
     val originalDate: LocalDate,
     val entry: FoodEntry? = null,
     val fixedName: String? = null,
+    val suggestedAmountMl: Int? = null,
 )
 
 private data class VitaminEditorState(
@@ -144,8 +148,12 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 data = viewModel.data,
                 date = selectedDate,
                 day = day,
-                onFormula = { foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь") },
-                onMilk = { foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко") },
+                onFormula = { amount ->
+                    foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь", suggestedAmountMl = amount)
+                },
+                onMilk = { amount ->
+                    foodEditor = FoodEditorState(selectedDate, fixedName = "Молоко", suggestedAmountMl = amount)
+                },
                 onEditFood = { foodEditor = FoodEditorState(selectedDate, it) },
                 onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
             )
@@ -235,6 +243,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             initial = state.entry,
             fixedName = state.fixedName,
             fixedUnit = state.fixedName?.let { "мл" },
+            initialAmountMl = state.suggestedAmountMl?.toDouble(),
             days = viewModel.data.days,
             onDismiss = { foodEditor = null },
             onSave = { targetDate, name, amount, unit, time ->
@@ -322,12 +331,60 @@ private fun VitaminDReminder(
 }
 
 @Composable
+private fun SmartFeedingCard(recommendation: SmartFeedingRecommendation) {
+    val timingText = when (recommendation.moment) {
+        FeedingMoment.EARLY -> recommendation.minutesUntilUsual
+            ?.takeIf { it > 0 }
+            ?.let { "По обычному ритму через ${formatMinutes(it)}" }
+            ?: "Ориентир на следующее кормление"
+        FeedingMoment.USUAL_TIME -> "Сейчас привычное время кормления"
+        FeedingMoment.LATER_THAN_USUAL -> "По обычному ритму уже пора"
+        FeedingMoment.NO_HISTORY -> "Пока считаю по суточной цели"
+    }
+    val goalText = if (recommendation.remainingToTargetMl > 0) {
+        "до цели ${recommendation.remainingToTargetMl} мл"
+    } else {
+        "суточная цель набрана"
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                "Ориентир сейчас · ≈${recommendation.amountMl} мл",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(timingText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Text(
+                "Обычно ${recommendation.usualAmountMl} мл · ритм ${formatMinutes(recommendation.usualIntervalMinutes)} · $goalText",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Text(
+                "Не обязательный объём: ориентируйтесь на голод и насыщение ребёнка.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = .78f),
+            )
+        }
+    }
+}
+
+private fun formatMinutes(minutes: Int): String = when {
+    minutes < 60 -> "$minutes мин"
+    minutes % 60 == 0 -> "${minutes / 60} ч"
+    else -> "${minutes / 60} ч ${minutes % 60} мин"
+}
+
+@Composable
 private fun MilkProgressCard(
     data: AppData,
     date: LocalDate,
     day: DayRecord,
-    onFormula: () -> Unit,
-    onMilk: () -> Unit,
+    onFormula: (Int?) -> Unit,
+    onMilk: (Int?) -> Unit,
     onEditFood: (FoodEntry) -> Unit,
     onMeasurement: () -> Unit,
 ) {
@@ -358,10 +415,24 @@ private fun MilkProgressCard(
             val lastFeeding = remember(minuteTick, date, data.days) {
                 lastFeedingInfo(date, data.days.values)
             }
+            val smartRecommendation = remember(minuteTick, date, data.days, guide) {
+                SmartFeedingGuide.calculate(data, date, guide)
+            }
             lastFeeding?.let { LastFeedingLabel(it) }
+            smartRecommendation?.let { SmartFeedingCard(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onMilk, modifier = Modifier.weight(1f).height(54.dp)) { Text("Молоко") }
-                Button(onClick = onFormula, modifier = Modifier.weight(1f).height(54.dp)) { Text("Смесь") }
+                Button(
+                    onClick = { onMilk(smartRecommendation?.amountMl) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                ) {
+                    Text(smartRecommendation?.let { "Молоко · ${it.amountMl}" } ?: "Молоко")
+                }
+                Button(
+                    onClick = { onFormula(smartRecommendation?.amountMl) },
+                    modifier = Modifier.weight(1f).height(54.dp),
+                ) {
+                    Text(smartRecommendation?.let { "Смесь · ${it.amountMl}" } ?: "Смесь")
+                }
             }
             Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(
@@ -409,6 +480,12 @@ private fun MilkProgressCard(
                             "Нажмите на маркер, чтобы изменить кормление. График можно увеличить щипком, двигать пальцем и сбросить двойным нажатием.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (smartRecommendation != null) {
+                        Text(
+                            "Умный ориентир учит обычный объём и ритм за 7 дней. Коррекция по суточной цели ограничена, чтобы не «догонять» норму одним большим кормлением.",
+                            style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     Text(result.explanation, style = MaterialTheme.typography.bodySmall)

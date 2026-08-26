@@ -65,18 +65,19 @@ internal fun FoodEditorDialog(
     initial: FoodEntry? = null,
     fixedName: String? = null,
     fixedUnit: String? = null,
+    initialAmountMl: Double? = null,
     days: Map<String, DayRecord> = emptyMap(),
     onDismiss: () -> Unit,
     onSave: (LocalDate, String, Double, String, String) -> Unit,
 ) {
-    val stateKey = initial?.id ?: "$fixedName-$initialDate"
+    val stateKey = initial?.id ?: "$fixedName-$initialDate-$initialAmountMl"
     var name by rememberSaveable(stateKey) { mutableStateOf(initial?.name ?: fixedName.orEmpty()) }
     var amount by rememberSaveable(stateKey) { mutableStateOf(initial?.amount?.let(::formatNumber).orEmpty()) }
     val feedingName = (fixedName ?: initial?.name).orEmpty().trim().lowercase()
     val feedingUnit = (fixedUnit ?: initial?.unit).orEmpty().trim().lowercase()
     val usesMilkSlider = feedingUnit in setOf("мл", "ml") && feedingName in setOf("молоко", "смесь")
     var milkAmount by rememberSaveable(stateKey) {
-        mutableStateOf(normalizeMilkAmount((initial?.amount ?: 100.0).toFloat()))
+        mutableStateOf(normalizeMilkAmount((initial?.amount ?: initialAmountMl ?: 100.0).toFloat()))
     }
     var unit by rememberSaveable(stateKey) { mutableStateOf(initial?.unit ?: fixedUnit ?: "г") }
     var time by rememberSaveable(stateKey) { mutableStateOf(initial?.time?.ifBlank { currentTime() } ?: currentTime()) }
