@@ -64,6 +64,58 @@ class SmartFeedingGuideTest {
     }
 
     @Test
+    fun full_recent_feeding_reduces_current_portion_to_zero() {
+        val data = AppData(
+            days = mapOf(
+                date.toString() to DayRecord(
+                    date = date.toString(),
+                    food = listOf(
+                        feeding("08:00", 130.0),
+                        feeding("12:00", 130.0),
+                        feeding("16:00", 130.0),
+                    ),
+                ),
+            ),
+        )
+
+        val result = SmartFeedingGuide.calculate(
+            data = data,
+            date = date,
+            guide = guide,
+            now = LocalDateTime.of(2026, 8, 26, 16, 0),
+        )!!
+
+        assertEquals(0, result.amountMl)
+        assertEquals(130, result.recentIntakeMl)
+    }
+
+    @Test
+    fun small_recent_feeding_leaves_only_a_partial_portion() {
+        val data = AppData(
+            days = mapOf(
+                date.toString() to DayRecord(
+                    date = date.toString(),
+                    food = listOf(
+                        feeding("08:00", 130.0),
+                        feeding("12:00", 130.0),
+                        feeding("16:00", 50.0),
+                    ),
+                ),
+            ),
+        )
+
+        val result = SmartFeedingGuide.calculate(
+            data = data,
+            date = date,
+            guide = guide,
+            now = LocalDateTime.of(2026, 8, 26, 16, 0),
+        )!!
+
+        assertEquals(90, result.amountMl)
+        assertEquals(50, result.recentIntakeMl)
+    }
+
+    @Test
     fun is_only_shown_for_today() {
         assertNull(
             SmartFeedingGuide.calculate(

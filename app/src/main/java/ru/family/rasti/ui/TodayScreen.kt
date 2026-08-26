@@ -468,6 +468,9 @@ private fun MilkProgressCard(
                                 append("${smartFeedingTimingText(smartRecommendation)}. ")
                                 append("Обычный объём: ${smartRecommendation.usualAmountMl} мл, ")
                                 append("обычный интервал: ${formatMinutes(smartRecommendation.usualIntervalMinutes)}. ")
+                                if (smartRecommendation.recentIntakeMl > 0) {
+                                    append("За последние ${formatMinutes(smartRecommendation.usualIntervalMinutes)}: ${smartRecommendation.recentIntakeMl} мл. ")
+                                }
                                 if (smartRecommendation.remainingToTargetMl > 0) {
                                     append("До суточной цели: ${smartRecommendation.remainingToTargetMl} мл.")
                                 } else {
@@ -477,7 +480,7 @@ private fun MilkProgressCard(
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
-                            "Расчёт учитывает обычный объём и ритм за 7 дней. Коррекция по суточной цели ограничена, чтобы не «догонять» норму одним большим кормлением. Это ориентир: сигналы голода и насыщения ребёнка важнее числа.",
+                            "Расчёт учитывает обычный объём и ритм за 7 дней, суточную цель, а также сколько и как давно ребёнок ел. Влияние недавних кормлений плавно снижается за обычный интервал. Это ориентир: сигналы голода и насыщения ребёнка важнее числа.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

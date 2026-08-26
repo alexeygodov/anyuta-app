@@ -22,6 +22,7 @@ data class SmartFeedingRecommendation(
     val usualIntervalMinutes: Int,
     val minutesSinceLast: Long?,
     val minutesUntilUsual: Int?,
+    val recentIntakeMl: Int,
     val remainingToTargetMl: Int,
     val moment: FeedingMoment,
 )
@@ -61,8 +62,18 @@ object SmartFeedingGuide {
         val paceCorrection = (expectedByNow - consumedToday) / feedsRemaining * .5
         val lowerBound = usualAmount * .85
         val upperBound = usualAmount * 1.15
-        val recommendedAmount = roundToFive((usualAmount + paceCorrection).coerceIn(lowerBound, upperBound))
-            .coerceIn(20, 200)
+        val fullFeedingAmount = (usualAmount + paceCorrection).coerceIn(lowerBound, upperBound)
+        val recentWindowEvents = events.filter { event ->
+            val ageMinutes = Duration.between(event.dateTime, now).toMinutes()
+            ageMinutes >= 0 && ageMinutes < usualInterval
+        }
+        val recentLoad = recentWindowEvents.sumOf { event ->
+            val ageMinutes = Duration.between(event.dateTime, now).toMinutes().coerceAtLeast(0)
+            val remainingInfluence = 1.0 - ageMinutes.toDouble() / usualInterval
+            event.entry.amount * remainingInfluence.coerceIn(0.0, 1.0)
+        }
+        val availableShare = (1.0 - recentLoad / usualAmount.coerceAtLeast(1)).coerceIn(0.0, 1.0)
+        val recommendedAmount = roundToFive(fullFeedingAmount * availableShare).coerceIn(0, 200)
 
         val last = events.lastOrNull()
         val minutesSinceLast = last?.let { Duration.between(it.dateTime, now).toMinutes() }
@@ -80,6 +91,7 @@ object SmartFeedingGuide {
             usualIntervalMinutes = usualInterval,
             minutesSinceLast = minutesSinceLast,
             minutesUntilUsual = minutesUntilUsual,
+            recentIntakeMl = recentWindowEvents.sumOf { it.entry.amount }.roundToInt(),
             remainingToTargetMl = (guide.targetMl - consumedToday).roundToInt().coerceAtLeast(0),
             moment = moment,
         )
