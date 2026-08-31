@@ -105,6 +105,7 @@ private data class SleepEditorState(
     val originalDate: LocalDate,
     val entry: SleepEntry? = null,
     val requireEnd: Boolean = false,
+    val quickDurationMinutes: Int? = null,
 )
 
 @Composable
@@ -165,6 +166,12 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 onStart = { sleepEditor = SleepEditorState(selectedDate) },
                 onWake = { sleep ->
                     sleepEditor = SleepEditorState(sleep.startDate, sleep.entry, requireEnd = true)
+                },
+                onQuickWake = { suggestedDuration ->
+                    sleepEditor = SleepEditorState(
+                        originalDate = selectedDate,
+                        quickDurationMinutes = suggestedDuration,
+                    )
                 },
             )
         }
@@ -340,33 +347,45 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         )
     }
     sleepEditor?.let { state ->
-        SleepEditorDialog(
-            title = when {
-                state.entry == null -> "Ребёнок уснул"
-                state.requireEnd && state.entry.endTime == null -> "Ребёнок проснулся"
-                else -> "Изменить сон"
-            },
-            initialStartDate = state.originalDate,
-            initial = state.entry,
-            requireEnd = state.requireEnd,
-            onDismiss = { sleepEditor = null },
-            onSave = { startDate, startTime, endDate, endTime ->
-                val original = state.entry
-                if (original == null) {
-                    viewModel.startSleep(startDate, startTime)
-                } else {
-                    viewModel.updateSleep(
-                        originalDate = state.originalDate,
-                        targetStartDate = startDate,
-                        original = original,
-                        startTime = startTime,
-                        endDate = endDate,
-                        endTime = endTime,
-                    )
-                }
-                sleepEditor = null
-            },
-        )
+        if (state.quickDurationMinutes != null) {
+            SleepDurationDialog(
+                initialWakeDate = state.originalDate,
+                initialDurationMinutes = state.quickDurationMinutes,
+                onDismiss = { sleepEditor = null },
+                onSave = { startDate, startTime, endDate, endTime ->
+                    viewModel.addCompletedSleep(startDate, startTime, endDate, endTime)
+                    sleepEditor = null
+                },
+            )
+        } else {
+            SleepEditorDialog(
+                title = when {
+                    state.entry == null -> "Ребёнок уснул"
+                    state.requireEnd && state.entry.endTime == null -> "Ребёнок проснулся"
+                    else -> "Изменить сон"
+                },
+                initialStartDate = state.originalDate,
+                initial = state.entry,
+                requireEnd = state.requireEnd,
+                onDismiss = { sleepEditor = null },
+                onSave = { startDate, startTime, endDate, endTime ->
+                    val original = state.entry
+                    if (original == null) {
+                        viewModel.startSleep(startDate, startTime)
+                    } else {
+                        viewModel.updateSleep(
+                            originalDate = state.originalDate,
+                            targetStartDate = startDate,
+                            original = original,
+                            startTime = startTime,
+                            endDate = endDate,
+                            endTime = endTime,
+                        )
+                    }
+                    sleepEditor = null
+                },
+            )
+        }
     }
 }
 
@@ -376,6 +395,7 @@ private fun SleepControlCard(
     selectedDate: LocalDate,
     onStart: () -> Unit,
     onWake: (DatedSleep) -> Unit,
+    onQuickWake: (Int) -> Unit,
 ) {
     var minuteTick by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
@@ -387,6 +407,10 @@ private fun SleepControlCard(
     val active = remember(data.days, minuteTick) { activeSleep(data) }
     val lastCompleted = remember(data.days, minuteTick) { lastCompletedSleep(data) }
     val canStart = active == null && selectedDate <= LocalDate.now()
+    val canWake = selectedDate <= LocalDate.now()
+    val suggestedDuration = lastCompleted?.let { sleepDurationMinutes(it.startDate, it.entry)?.toInt() }
+        ?.coerceIn(5, 720)
+        ?: 60
     val status = active?.let { sleep ->
         val duration = sleepDurationMinutes(sleep.startDate, sleep.entry)
         "Спит${duration?.let { " · ${formatSleepDuration(it)}" }.orEmpty()} · с ${sleep.entry.startTime}"
@@ -409,8 +433,8 @@ private fun SleepControlCard(
                     Text("Уснула")
                 }
                 Button(
-                    onClick = { active?.let(onWake) },
-                    enabled = active != null,
+                    onClick = { active?.let(onWake) ?: onQuickWake(suggestedDuration) },
+                    enabled = canWake,
                     modifier = Modifier.weight(1f).height(52.dp),
                 ) {
                     Text("Проснулась")

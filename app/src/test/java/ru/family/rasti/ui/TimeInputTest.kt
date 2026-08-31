@@ -41,6 +41,14 @@ class TimeInputTest {
     }
 
     @Test
+    fun normalizeSleepDuration_usesFiveMinuteStepsAndLimits() {
+        assertEquals(60, normalizeSleepDuration(62f))
+        assertEquals(65, normalizeSleepDuration(63f))
+        assertEquals(5, normalizeSleepDuration(0f))
+        assertEquals(720, normalizeSleepDuration(900f))
+    }
+
+    @Test
     fun popularMilkAmounts_picks_most_frequent_sorted_ascending() {
         val updatedAt = "2026-08-19T20:00:00+04:00"
         val days = listOf(

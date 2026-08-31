@@ -19,12 +19,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -328,6 +330,102 @@ internal fun SleepEditorDialog(
 }
 
 @Composable
+internal fun SleepDurationDialog(
+    initialWakeDate: LocalDate,
+    initialDurationMinutes: Int = 60,
+    onDismiss: () -> Unit,
+    onSave: (LocalDate, String, LocalDate, String) -> Unit,
+) {
+    val stateKey = "$initialWakeDate-$initialDurationMinutes"
+    var wakeDate by rememberSaveable(stateKey) { mutableStateOf(initialWakeDate) }
+    var wakeTime by rememberSaveable(stateKey) { mutableStateOf(currentTime()) }
+    var durationMinutes by rememberSaveable(stateKey) {
+        mutableStateOf(normalizeSleepDuration(initialDurationMinutes.toFloat()))
+    }
+    val normalizedWakeTime = normalizeTimeToFiveMinutes(wakeTime)
+    val wakeDateTime = normalizedWakeTime?.let { wakeDate.atTime(LocalTime.parse(it, timeFormatter)) }
+    val startDateTime = wakeDateTime?.minusMinutes(durationMinutes.toLong())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Добавить завершённый сон") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Спала ${formatSleepDuration(durationMinutes.toLong())}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Slider(
+                    value = durationMinutes.toFloat(),
+                    onValueChange = { durationMinutes = normalizeSleepDuration(it) },
+                    valueRange = 5f..720f,
+                    steps = 142,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = { durationMinutes = normalizeSleepDuration(durationMinutes - 5f) }) {
+                        Text("−5 мин")
+                    }
+                    TextButton(onClick = { durationMinutes = normalizeSleepDuration(durationMinutes + 5f) }) {
+                        Text("+5 мин")
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf(30, 60, 90, 120).forEach { preset ->
+                        AssistChip(
+                            onClick = { durationMinutes = preset },
+                            label = {
+                                Text(
+                                    when (preset) {
+                                        30 -> "30 м"
+                                        60 -> "1 ч"
+                                        90 -> "1:30"
+                                        else -> "2 ч"
+                                    },
+                                )
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+                Text("Когда проснулась", fontWeight = FontWeight.SemiBold)
+                DatePickerButton(
+                    date = wakeDate,
+                    onDateChange = { wakeDate = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maximumDate = LocalDate.now(),
+                )
+                TimeInput(wakeTime, onTimeChange = { wakeTime = it })
+                startDateTime?.let {
+                    Text(
+                        "Начало будет рассчитано: ${it.toLocalDate().format(displayDateFormatter)} в ${it.toLocalTime().format(timeFormatter)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val start = startDateTime ?: return@Button
+                    onSave(
+                        start.toLocalDate(),
+                        start.toLocalTime().format(timeFormatter),
+                        wakeDate,
+                        normalizedWakeTime ?: wakeTime,
+                    )
+                },
+                enabled = startDateTime != null,
+            ) { Text("Сохранить сон") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
+}
+
+@Composable
 internal fun DatePickerButton(
     date: LocalDate,
     onDateChange: (LocalDate) -> Unit,
@@ -499,6 +597,9 @@ internal fun adjustTimeInput(value: String, minutes: Long): String {
 
 internal fun normalizeMilkAmount(value: Float): Float =
     ((value / 5f).roundToInt() * 5f).coerceIn(0f, 200f)
+
+internal fun normalizeSleepDuration(value: Float): Int =
+    ((value / 5f).roundToInt() * 5).coerceIn(5, 720)
 
 internal fun popularMilkAmounts(days: Collection<DayRecord>, feedingName: String, limit: Int = 4): List<Int> {
     val normalizedName = feedingName.trim().lowercase()

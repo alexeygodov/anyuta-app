@@ -159,6 +159,25 @@ class RastiViewModel(
         persist()
     }
 
+    fun addCompletedSleep(
+        startDate: LocalDate,
+        startTime: String,
+        endDate: LocalDate,
+        endTime: String,
+    ) {
+        val day = day(startDate)
+        data = data.updateDay(
+            day.copy(
+                sleeps = day.sleeps + SleepEntry(
+                    startTime = startTime,
+                    endDate = endDate.toString(),
+                    endTime = endTime,
+                ),
+            ),
+        )
+        persist()
+    }
+
     fun updateSleep(
         originalDate: LocalDate,
         targetStartDate: LocalDate,
