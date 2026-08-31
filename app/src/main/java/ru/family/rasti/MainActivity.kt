@@ -19,6 +19,7 @@ import ru.family.rasti.notify.ReminderNotifier
 import ru.family.rasti.notify.ReminderScheduler
 import ru.family.rasti.ui.RastiApp
 import ru.family.rasti.ui.theme.RastiTheme
+import ru.family.rasti.widget.AnyutaDashboardWidget
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        AnyutaDashboardWidget.updateAll(applicationContext)
         AppVisibility.inForeground = true
         ReminderNotifier(applicationContext).clearAll()
     }

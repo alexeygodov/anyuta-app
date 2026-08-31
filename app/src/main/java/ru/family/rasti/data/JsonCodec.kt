@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 object JsonCodec {
     fun encodeAppData(data: AppData): String = JSONObject()
-        .put("version", 3)
+        .put("version", 4)
         .put("profile", profileToJson(data.profile))
         .put("days", JSONArray(data.days.values.sortedBy { it.date }.map(::dayToJson)))
         .toString(2)
@@ -99,6 +99,21 @@ object JsonCodec {
         updatedAt = json.optString("updatedAt"),
     )
 
+    private fun sleepToJson(item: SleepEntry) = JSONObject()
+        .put("id", item.id)
+        .put("startTime", item.startTime)
+        .apply { item.endDate?.let { put("endDate", it) } }
+        .apply { item.endTime?.let { put("endTime", it) } }
+        .put("updatedAt", item.updatedAt)
+
+    private fun sleepFromJson(json: JSONObject) = SleepEntry(
+        id = json.getString("id"),
+        startTime = json.optString("startTime"),
+        endDate = json.optString("endDate").takeIf { it.isNotBlank() },
+        endTime = json.optString("endTime").takeIf { it.isNotBlank() },
+        updatedAt = json.optString("updatedAt"),
+    )
+
     private fun measurementToJson(value: Measurement) = JSONObject()
         .apply {
             value.heightCm?.let { put("heightCm", it) }
@@ -119,9 +134,11 @@ object JsonCodec {
         .put("food", JSONArray(day.food.map(::foodToJson)))
         .put("vitamins", JSONArray(day.vitamins.map(::vitaminToJson)))
         .put("vaccinations", JSONArray(day.vaccinations.map(::vaccinationToJson)))
+        .put("sleeps", JSONArray(day.sleeps.map(::sleepToJson)))
         .put("deletedFoodIds", JSONArray(day.deletedFoodIds.toList()))
         .put("deletedVitaminIds", JSONArray(day.deletedVitaminIds.toList()))
         .put("deletedVaccinationIds", JSONArray(day.deletedVaccinationIds.toList()))
+        .put("deletedSleepIds", JSONArray(day.deletedSleepIds.toList()))
         .apply { day.measurement?.let { put("measurement", measurementToJson(it)) } }
         .apply { day.measurementDeletedAt?.let { put("measurementDeletedAt", it) } }
         .put("note", day.note)
@@ -131,14 +148,17 @@ object JsonCodec {
         val foodArray = json.optJSONArray("food") ?: JSONArray()
         val vitaminArray = json.optJSONArray("vitamins") ?: JSONArray()
         val vaccinationArray = json.optJSONArray("vaccinations") ?: JSONArray()
+        val sleepArray = json.optJSONArray("sleeps") ?: JSONArray()
         return DayRecord(
             date = json.getString("date"),
             food = List(foodArray.length()) { foodFromJson(foodArray.getJSONObject(it)) },
             vitamins = List(vitaminArray.length()) { vitaminFromJson(vitaminArray.getJSONObject(it)) },
             vaccinations = List(vaccinationArray.length()) { vaccinationFromJson(vaccinationArray.getJSONObject(it)) },
+            sleeps = List(sleepArray.length()) { sleepFromJson(sleepArray.getJSONObject(it)) },
             deletedFoodIds = json.optJSONArray("deletedFoodIds").toStringSet(),
             deletedVitaminIds = json.optJSONArray("deletedVitaminIds").toStringSet(),
             deletedVaccinationIds = json.optJSONArray("deletedVaccinationIds").toStringSet(),
+            deletedSleepIds = json.optJSONArray("deletedSleepIds").toStringSet(),
             measurement = json.optJSONObject("measurement")?.let(::measurementFromJson),
             measurementDeletedAt = json.optString("measurementDeletedAt").takeIf { it.isNotBlank() },
             note = json.optString("note"),

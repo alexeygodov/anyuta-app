@@ -19,6 +19,7 @@ import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.LocalStore
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
 import ru.family.rasti.data.VaccinationStatus
@@ -34,6 +35,7 @@ import ru.family.rasti.notify.collectSyncUpdates
 import ru.family.rasti.sync.GitHubSync
 import ru.family.rasti.sync.decodeSyncState
 import ru.family.rasti.sync.encodeSyncState
+import ru.family.rasti.sleep.activeSleep
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.OffsetDateTime
@@ -138,6 +140,68 @@ class RastiViewModel(
             day.copy(
                 food = day.food.filterNot { it.id == id },
                 deletedFoodIds = day.deletedFoodIds + id,
+            ),
+        )
+        persist()
+    }
+
+    fun startSleep(date: LocalDate, time: String) {
+        if (activeSleep(data) != null) {
+            statusMessage = "Сон уже начат"
+            return
+        }
+        val day = day(date)
+        data = data.updateDay(day.copy(sleeps = day.sleeps + SleepEntry(startTime = time)))
+        persist()
+    }
+
+    fun updateSleep(
+        originalDate: LocalDate,
+        targetStartDate: LocalDate,
+        original: SleepEntry,
+        startTime: String,
+        endDate: LocalDate?,
+        endTime: String?,
+    ) {
+        val updated = original.copy(
+            startTime = startTime,
+            endDate = endDate?.toString(),
+            endTime = endTime,
+            updatedAt = OffsetDateTime.now().toString(),
+        )
+        if (originalDate == targetStartDate) {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    sleeps = source.sleeps.map { if (it.id == original.id) updated else it },
+                    deletedSleepIds = source.deletedSleepIds - original.id,
+                ),
+            )
+        } else {
+            val source = day(originalDate)
+            data = data.updateDay(
+                source.copy(
+                    sleeps = source.sleeps.filterNot { it.id == original.id },
+                    deletedSleepIds = source.deletedSleepIds + original.id,
+                ),
+            )
+            val target = day(targetStartDate)
+            data = data.updateDay(
+                target.copy(
+                    sleeps = target.sleeps.filterNot { it.id == original.id } + updated,
+                    deletedSleepIds = target.deletedSleepIds - original.id,
+                ),
+            )
+        }
+        persist()
+    }
+
+    fun removeSleep(date: LocalDate, id: String) {
+        val day = day(date)
+        data = data.updateDay(
+            day.copy(
+                sleeps = day.sleeps.filterNot { it.id == id },
+                deletedSleepIds = day.deletedSleepIds + id,
             ),
         )
         persist()

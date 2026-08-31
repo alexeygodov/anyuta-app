@@ -27,6 +27,7 @@ class MaxMessenger(context: Context) {
     private fun emojiFor(title: String): String = when {
         title.contains("кормление", ignoreCase = true) -> "🍼"
         title.contains("Витамин", ignoreCase = true) -> "💊"
+        title.contains("Сон", ignoreCase = true) -> "🌙"
         else -> "🔔"
     }
 }

@@ -6,6 +6,7 @@ import org.junit.Test
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
 import java.time.LocalDate
 
@@ -103,5 +104,22 @@ class SyncDiffTest {
         val updates = collectSyncUpdates(before, after, today)
         assertEquals(1, updates.size)
         assertEquals("Смесь · 130,5 мл · 23:40", updates[0].text)
+    }
+
+    @Test
+    fun collectSyncUpdates_detectsSleepStartAndCompletion() {
+        val open = SleepEntry(id = "sleep", startTime = "12:00")
+        val beforeStart = dataWith(DayRecord(date = today.toString()))
+        val afterStart = dataWith(DayRecord(date = today.toString(), sleeps = listOf(open)))
+
+        val started = collectSyncUpdates(beforeStart, afterStart, today)
+        assertEquals("Сон начался", started.single().title)
+
+        val completed = open.copy(endDate = today.toString(), endTime = "13:30")
+        val afterWake = dataWith(DayRecord(date = today.toString(), sleeps = listOf(completed)))
+        val ended = collectSyncUpdates(afterStart, afterWake, today)
+
+        assertEquals("Сон завершён", ended.single().title)
+        assertEquals("12:00–13:30 · 1 ч 30 мин", ended.single().text)
     }
 }

@@ -9,6 +9,7 @@ import ru.family.rasti.data.ChildProfile
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VaccinationEntry
 
 class GitHubSyncTest {
@@ -83,5 +84,27 @@ class GitHubSyncTest {
 
         assertTrue(merged.vaccinations.isEmpty())
         assertTrue("vaccine" in merged.deletedVaccinationIds)
+    }
+
+    @Test
+    fun merge_keepsNewestSleepAndDoesNotResurrectDeletedSleep() {
+        val older = SleepEntry(id = "sleep", startTime = "12:00", updatedAt = "2026-08-31T12:00:00Z")
+        val newer = older.copy(
+            endDate = "2026-08-31",
+            endTime = "13:30",
+            updatedAt = "2026-08-31T13:30:00Z",
+        )
+        val deleted = SleepEntry(id = "deleted-sleep", startTime = "15:00")
+        val localDay = DayRecord("2026-08-31", sleeps = listOf(older), deletedSleepIds = setOf(deleted.id))
+        val remoteDay = DayRecord("2026-08-31", sleeps = listOf(newer, deleted))
+
+        val merged = GitHubSync().merge(
+            AppData(days = mapOf(localDay.date to localDay)),
+            AppData(days = mapOf(remoteDay.date to remoteDay)),
+        ).days.getValue("2026-08-31")
+
+        assertEquals(listOf("sleep"), merged.sleeps.map { it.id })
+        assertEquals("13:30", merged.sleeps.single().endTime)
+        assertTrue(deleted.id in merged.deletedSleepIds)
     }
 }

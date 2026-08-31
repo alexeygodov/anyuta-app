@@ -34,6 +34,14 @@ data class VitaminEntry(
     val updatedAt: String = OffsetDateTime.now().toString(),
 )
 
+data class SleepEntry(
+    val id: String = UUID.randomUUID().toString(),
+    val startTime: String,
+    val endDate: String? = null,
+    val endTime: String? = null,
+    val updatedAt: String = OffsetDateTime.now().toString(),
+)
+
 enum class VaccinationStatus { PLANNED, COMPLETED }
 
 data class VaccinationEntry(
@@ -56,9 +64,11 @@ data class DayRecord(
     val food: List<FoodEntry> = emptyList(),
     val vitamins: List<VitaminEntry> = emptyList(),
     val vaccinations: List<VaccinationEntry> = emptyList(),
+    val sleeps: List<SleepEntry> = emptyList(),
     val deletedFoodIds: Set<String> = emptySet(),
     val deletedVitaminIds: Set<String> = emptySet(),
     val deletedVaccinationIds: Set<String> = emptySet(),
+    val deletedSleepIds: Set<String> = emptySet(),
     val measurement: Measurement? = null,
     val measurementDeletedAt: String? = null,
     val note: String = "",

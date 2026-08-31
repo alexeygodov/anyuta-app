@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.FoodEntry
+import ru.family.rasti.sleep.SleepSegment
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -67,6 +68,7 @@ private data class FeedingPoint(
 @Composable
 internal fun MilkIntakeChart(
     entries: List<FoodEntry>,
+    sleepSegments: List<SleepSegment> = emptyList(),
     date: LocalDate,
     minimumMl: Int?,
     targetMl: Int?,
@@ -85,6 +87,7 @@ internal fun MilkIntakeChart(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val plotColor = MaterialTheme.colorScheme.surfaceVariant
     val nowColor = MaterialTheme.colorScheme.error
+    val sleepColor = MaterialTheme.colorScheme.inversePrimary
     val points = remember(entries) { feedingPoints(entries) }
     val total = points.lastOrNull()?.cumulativeMl?.toDouble() ?: 0.0
     val milkTotal = points.filter(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
@@ -244,6 +247,26 @@ internal fun MilkIntakeChart(
             }
 
             clipRect(left, top, right, bottom) {
+                sleepSegments.forEach { sleep ->
+                    val start = sleep.startMinute.toFloat().coerceIn(viewportStart, viewportEnd)
+                    val end = sleep.endMinute.toFloat().coerceIn(viewportStart, viewportEnd)
+                    if (end > start) {
+                        val sleepLeft = x(start)
+                        val sleepRight = x(end)
+                        drawRect(
+                            color = sleepColor.copy(alpha = .09f),
+                            topLeft = Offset(sleepLeft, top),
+                            size = Size(sleepRight - sleepLeft, plotHeight),
+                        )
+                        drawRoundRect(
+                            color = sleepColor.copy(alpha = if (sleep.ongoing) .78f else .58f),
+                            topLeft = Offset(sleepLeft, top + 3.dp.toPx()),
+                            size = Size((sleepRight - sleepLeft).coerceAtLeast(3.dp.toPx()), 7.dp.toPx()),
+                            cornerRadius = CornerRadius(4.dp.toPx()),
+                        )
+                    }
+                }
+
                 if (minimumMl != null && targetMl != null && maximumMl != null) {
                     fun expected(value: Int, minute: Float): Float = value * minute.coerceIn(0f, 1440f) / 1440f
                     val normBand = Path().apply {
@@ -431,7 +454,16 @@ internal fun MilkIntakeChart(
             FeedingLegendItem(milkColor, isMilk = true, label = "Молоко ${formatNumber(milkTotal)}")
             FeedingLegendItem(formulaColor, isMilk = false, label = "Смесь ${formatNumber(formulaTotal)}")
             if (targetMl != null) GoalLegendItem(normColor)
+            if (sleepSegments.isNotEmpty()) SleepLegendItem(sleepColor)
         }
+    }
+}
+
+@Composable
+private fun SleepLegendItem(color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        Box(Modifier.size(width = 13.dp, height = 6.dp).background(color.copy(alpha = .7f), RoundedCornerShape(50)))
+        Text("Сон", style = MaterialTheme.typography.labelSmall)
     }
 }
 

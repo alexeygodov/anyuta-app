@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ChevronLeft
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -63,12 +64,19 @@ import ru.family.rasti.data.AppData
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.displayDose
 import ru.family.rasti.feeding.FeedingMoment
 import ru.family.rasti.feeding.FeedingGuide
 import ru.family.rasti.feeding.SmartFeedingGuide
 import ru.family.rasti.feeding.SmartFeedingRecommendation
+import ru.family.rasti.sleep.DatedSleep
+import ru.family.rasti.sleep.activeSleep
+import ru.family.rasti.sleep.formatSleepDuration
+import ru.family.rasti.sleep.lastCompletedSleep
+import ru.family.rasti.sleep.sleepDurationMinutes
+import ru.family.rasti.sleep.sleepsForDate
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -91,6 +99,12 @@ private data class VitaminEditorState(
 private data class MeasurementEditorState(
     val originalDate: LocalDate,
     val measurement: Measurement? = null,
+)
+
+private data class SleepEditorState(
+    val originalDate: LocalDate,
+    val entry: SleepEntry? = null,
+    val requireEnd: Boolean = false,
 )
 
 @Composable
@@ -121,6 +135,7 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var foodEditor by remember { mutableStateOf<FoodEditorState?>(null) }
     var vitaminEditor by remember { mutableStateOf<VitaminEditorState?>(null) }
     var measurementEditor by remember { mutableStateOf<MeasurementEditorState?>(null) }
+    var sleepEditor by remember { mutableStateOf<SleepEditorState?>(null) }
     var note by remember(day.date, day.note) { mutableStateOf(day.note) }
 
     LazyColumn(
@@ -144,6 +159,16 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             }
         }
         item {
+            SleepControlCard(
+                data = viewModel.data,
+                selectedDate = selectedDate,
+                onStart = { sleepEditor = SleepEditorState(selectedDate) },
+                onWake = { sleep ->
+                    sleepEditor = SleepEditorState(sleep.startDate, sleep.entry, requireEnd = true)
+                },
+            )
+        }
+        item {
             MilkProgressCard(
                 data = viewModel.data,
                 date = selectedDate,
@@ -157,6 +182,30 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 onEditFood = { foodEditor = FoodEditorState(selectedDate, it) },
                 onMeasurement = { measurementEditor = MeasurementEditorState(selectedDate, day.measurement) },
             )
+        }
+        item { SectionHeader("Сон", onAdd = { sleepEditor = SleepEditorState(selectedDate) }) }
+        if (day.sleeps.isEmpty()) {
+            item { EmptyHint("Снов за этот день пока нет") }
+        } else {
+            items(day.sleeps.sortedByDescending { it.startTime }, key = { it.id }) { entry ->
+                val duration = sleepDurationMinutes(selectedDate, entry)
+                EntryRow(
+                    title = if (entry.endTime == null) "Сон идёт" else duration?.let { "Сон · ${formatSleepDuration(it)}" } ?: "Сон",
+                    subtitle = if (entry.endTime == null) {
+                        "с ${entry.startTime}"
+                    } else {
+                        "${entry.startTime}–${entry.endTime}"
+                    },
+                    onEdit = {
+                        sleepEditor = SleepEditorState(
+                            originalDate = selectedDate,
+                            entry = entry,
+                            requireEnd = entry.endTime != null,
+                        )
+                    },
+                    onDelete = { viewModel.removeSleep(selectedDate, entry.id) },
+                )
+            }
         }
         item { DaySummary(day) }
         item { SectionHeader("Еда и питьё", onAdd = { foodEditor = FoodEditorState(selectedDate) }) }
@@ -290,6 +339,85 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             },
         )
     }
+    sleepEditor?.let { state ->
+        SleepEditorDialog(
+            title = when {
+                state.entry == null -> "Ребёнок уснул"
+                state.requireEnd && state.entry.endTime == null -> "Ребёнок проснулся"
+                else -> "Изменить сон"
+            },
+            initialStartDate = state.originalDate,
+            initial = state.entry,
+            requireEnd = state.requireEnd,
+            onDismiss = { sleepEditor = null },
+            onSave = { startDate, startTime, endDate, endTime ->
+                val original = state.entry
+                if (original == null) {
+                    viewModel.startSleep(startDate, startTime)
+                } else {
+                    viewModel.updateSleep(
+                        originalDate = state.originalDate,
+                        targetStartDate = startDate,
+                        original = original,
+                        startTime = startTime,
+                        endDate = endDate,
+                        endTime = endTime,
+                    )
+                }
+                sleepEditor = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun SleepControlCard(
+    data: AppData,
+    selectedDate: LocalDate,
+    onStart: () -> Unit,
+    onWake: (DatedSleep) -> Unit,
+) {
+    var minuteTick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            minuteTick++
+        }
+    }
+    val active = remember(data.days, minuteTick) { activeSleep(data) }
+    val lastCompleted = remember(data.days, minuteTick) { lastCompletedSleep(data) }
+    val canStart = active == null && selectedDate <= LocalDate.now()
+    val status = active?.let { sleep ->
+        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry)
+        "Спит${duration?.let { " · ${formatSleepDuration(it)}" }.orEmpty()} · с ${sleep.entry.startTime}"
+    } ?: lastCompleted?.let { sleep ->
+        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry)
+        "Последний сон${duration?.let { " · ${formatSleepDuration(it)}" }.orEmpty()} · до ${sleep.entry.endTime}"
+    } ?: "Сейчас не спит"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                Text(status, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = onStart, enabled = canStart, modifier = Modifier.weight(1f).height(52.dp)) {
+                    Text("Уснула")
+                }
+                Button(
+                    onClick = { active?.let(onWake) },
+                    enabled = active != null,
+                    modifier = Modifier.weight(1f).height(52.dp),
+                ) {
+                    Text("Проснулась")
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -416,6 +544,7 @@ private fun MilkProgressCard(
             Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(
                 entries = milkEntries,
+                sleepSegments = sleepsForDate(data, date),
                 date = date,
                 minimumMl = guide?.minimumMl,
                 targetMl = guide?.targetMl,
@@ -537,6 +666,9 @@ private fun DaySummary(day: DayRecord) {
                 else "Еда: " + totals.entries.joinToString(" · ") { "${formatNumber(it.value)} ${it.key}" },
             )
             Text("Витамины: ${day.vitamins.size}")
+            val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
+            val sleepMinutes = date?.let { value -> day.sleeps.sumOf { sleepDurationMinutes(value, it) ?: 0L } } ?: 0L
+            Text(if (sleepMinutes > 0) "Сон: ${formatSleepDuration(sleepMinutes)}" else "Сон: нет записей")
         }
     }
 }

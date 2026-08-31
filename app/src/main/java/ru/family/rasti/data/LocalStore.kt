@@ -3,6 +3,7 @@ package ru.family.rasti.data
 import android.content.Context
 import androidx.core.content.edit
 import java.io.File
+import ru.family.rasti.widget.AnyutaDashboardWidget
 
 class LocalStore(private val context: Context) {
     private val dataFile = File(context.filesDir, "rasti-data.json")
@@ -22,6 +23,7 @@ class LocalStore(private val context: Context) {
             dataFile.writeText(temporary.readText())
             temporary.delete()
         }
+        AnyutaDashboardWidget.updateAll(context)
     }
 
     fun loadSyncState(): String? = runCatching {

@@ -2,6 +2,8 @@ package ru.family.rasti.notify
 
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.displayDose
+import ru.family.rasti.sleep.formatSleepDuration
+import ru.family.rasti.sleep.sleepDurationMinutes
 import java.time.LocalDate
 
 data class SyncUpdate(val title: String, val text: String)
@@ -33,6 +35,27 @@ fun collectSyncUpdates(before: AppData, after: AppData, today: LocalDate): List<
                     text = "${entry.displayDose()} · ${entry.time}",
                 )
             }
+
+        val knownSleeps = beforeDay?.sleeps?.associateBy { it.id }.orEmpty()
+        afterDay.sleeps.sortedBy { it.startTime }.forEach { sleep ->
+            val previous = knownSleeps[sleep.id]
+            when {
+                previous == null && sleep.endTime == null -> updates += SyncUpdate(
+                    title = "Сон начался",
+                    text = "Уснула в ${sleep.startTime}",
+                )
+                previous == null || (previous.endTime == null && sleep.endTime != null) -> {
+                    val duration = sleepDurationMinutes(date, sleep)
+                    updates += SyncUpdate(
+                        title = "Сон завершён",
+                        text = buildString {
+                            append("${sleep.startTime}–${sleep.endTime}")
+                            duration?.let { append(" · ${formatSleepDuration(it)}") }
+                        },
+                    )
+                }
+            }
+        }
     }
     return updates
 }

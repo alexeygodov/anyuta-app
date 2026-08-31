@@ -9,6 +9,7 @@ import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.JsonCodec
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.isPlaceholder
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
@@ -328,6 +329,7 @@ class GitHubSync {
         val deletedFoodIds = first.deletedFoodIds + second.deletedFoodIds
         val deletedVitaminIds = first.deletedVitaminIds + second.deletedVitaminIds
         val deletedVaccinationIds = first.deletedVaccinationIds + second.deletedVaccinationIds
+        val deletedSleepIds = first.deletedSleepIds + second.deletedSleepIds
         val measurementDeletedAt = listOfNotNull(first.measurementDeletedAt, second.measurementDeletedAt).maxOrNull()
         val newestMeasurement = newerMeasurement(first.measurement, second.measurement)
         val visibleMeasurement = newestMeasurement?.takeIf { measurement ->
@@ -345,9 +347,12 @@ class GitHubSync {
                 VaccinationEntry::id,
                 VaccinationEntry::updatedAt,
             ).filterNot { it.id in deletedVaccinationIds },
+            sleeps = mergeById(first.sleeps, second.sleeps, SleepEntry::id, SleepEntry::updatedAt)
+                .filterNot { it.id in deletedSleepIds },
             deletedFoodIds = deletedFoodIds,
             deletedVitaminIds = deletedVitaminIds,
             deletedVaccinationIds = deletedVaccinationIds,
+            deletedSleepIds = deletedSleepIds,
             measurement = visibleMeasurement,
             measurementDeletedAt = measurementDeletedAt,
             note = if (firstNewer) first.note else second.note,

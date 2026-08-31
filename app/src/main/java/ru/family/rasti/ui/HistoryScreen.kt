@@ -27,8 +27,11 @@ import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.displayDose
+import ru.family.rasti.sleep.formatSleepDuration
+import ru.family.rasti.sleep.sleepDurationMinutes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -36,6 +39,7 @@ import java.util.Locale
 private data class HistoryFoodEdit(val date: LocalDate, val entry: FoodEntry)
 private data class HistoryVitaminEdit(val date: LocalDate, val entry: VitaminEntry)
 private data class HistoryMeasurementEdit(val date: LocalDate, val measurement: Measurement)
+private data class HistorySleepEdit(val date: LocalDate, val entry: SleepEntry)
 
 @Composable
 fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
@@ -45,6 +49,7 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var foodEdit by remember { mutableStateOf<HistoryFoodEdit?>(null) }
     var vitaminEdit by remember { mutableStateOf<HistoryVitaminEdit?>(null) }
     var measurementEdit by remember { mutableStateOf<HistoryMeasurementEdit?>(null) }
+    var sleepEdit by remember { mutableStateOf<HistorySleepEdit?>(null) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -69,6 +74,7 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     onFoodEdit = { foodEdit = HistoryFoodEdit(LocalDate.parse(day.date), it) },
                     onVitaminEdit = { vitaminEdit = HistoryVitaminEdit(LocalDate.parse(day.date), it) },
                     onMeasurementEdit = { measurementEdit = HistoryMeasurementEdit(LocalDate.parse(day.date), it) },
+                    onSleepEdit = { sleepEdit = HistorySleepEdit(LocalDate.parse(day.date), it) },
                 )
             }
         }
@@ -110,6 +116,19 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             },
         )
     }
+    sleepEdit?.let { edit ->
+        SleepEditorDialog(
+            title = "Изменить сон",
+            initialStartDate = edit.date,
+            initial = edit.entry,
+            requireEnd = edit.entry.endTime != null,
+            onDismiss = { sleepEdit = null },
+            onSave = { startDate, startTime, endDate, endTime ->
+                viewModel.updateSleep(edit.date, startDate, edit.entry, startTime, endDate, endTime)
+                sleepEdit = null
+            },
+        )
+    }
 }
 
 @Composable
@@ -147,6 +166,7 @@ private fun HistoryDay(
     onFoodEdit: (FoodEntry) -> Unit,
     onVitaminEdit: (VitaminEntry) -> Unit,
     onMeasurementEdit: (Measurement) -> Unit,
+    onSleepEdit: (SleepEntry) -> Unit,
 ) {
     val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
     Card(Modifier.fillMaxWidth()) {
@@ -156,8 +176,16 @@ private fun HistoryDay(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            if (day.food.isEmpty() && day.vitamins.isEmpty() && day.measurement == null && day.note.isBlank()) {
+            if (day.food.isEmpty() && day.vitamins.isEmpty() && day.sleeps.isEmpty() && day.measurement == null && day.note.isBlank()) {
                 Text("Нет записей", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            day.sleeps.sortedBy { it.startTime }.forEach { entry ->
+                val duration = date?.let { sleepDurationMinutes(it, entry) }
+                EditableHistoryRow(
+                    title = if (entry.endTime == null) "Сон идёт" else duration?.let { "Сон · ${formatSleepDuration(it)}" } ?: "Сон",
+                    subtitle = if (entry.endTime == null) "с ${entry.startTime}" else "${entry.startTime}–${entry.endTime}",
+                    onEdit = { onSleepEdit(entry) },
+                )
             }
             day.food.sortedBy { it.time }.forEach { entry ->
                 EditableHistoryRow(

@@ -1,0 +1,80 @@
+package ru.family.rasti.sleep
+
+import ru.family.rasti.data.AppData
+import ru.family.rasti.data.SleepEntry
+import java.time.Duration
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+
+data class DatedSleep(val startDate: LocalDate, val entry: SleepEntry)
+
+data class SleepSegment(
+    val entry: SleepEntry,
+    val startMinute: Int,
+    val endMinute: Int,
+    val ongoing: Boolean,
+)
+
+fun sleepStart(date: LocalDate, entry: SleepEntry): LocalDateTime? =
+    runCatching { date.atTime(LocalTime.parse(entry.startTime)) }.getOrNull()
+
+fun sleepEnd(entry: SleepEntry): LocalDateTime? {
+    val date = entry.endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+    val time = entry.endTime?.let { runCatching { LocalTime.parse(it) }.getOrNull() } ?: return null
+    return date.atTime(time)
+}
+
+fun sleepDurationMinutes(startDate: LocalDate, entry: SleepEntry, now: LocalDateTime = LocalDateTime.now()): Long? {
+    val start = sleepStart(startDate, entry) ?: return null
+    val end = sleepEnd(entry) ?: now
+    return Duration.between(start, end).toMinutes().takeIf { it >= 0 }
+}
+
+fun activeSleep(data: AppData): DatedSleep? = data.days.values.asSequence()
+    .flatMap { day ->
+        val date = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptySequence()
+        day.sleeps.asSequence().filter { it.endDate == null || it.endTime == null }.map { DatedSleep(date, it) }
+    }
+    .maxByOrNull { sleepStart(it.startDate, it.entry) ?: LocalDateTime.MIN }
+
+fun lastCompletedSleep(data: AppData, cutoff: LocalDateTime = LocalDateTime.now()): DatedSleep? =
+    data.days.values.asSequence()
+        .flatMap { day ->
+            val date = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptySequence()
+            day.sleeps.asSequence().map { DatedSleep(date, it) }
+        }
+        .filter { sleep -> sleepEnd(sleep.entry)?.let { it <= cutoff } == true }
+        .maxByOrNull { sleepEnd(it.entry) ?: LocalDateTime.MIN }
+
+fun sleepsForDate(data: AppData, date: LocalDate, now: LocalDateTime = LocalDateTime.now()): List<SleepSegment> {
+    val dayStart = date.atStartOfDay()
+    val dayEnd = date.plusDays(1).atStartOfDay()
+    return data.days.values.asSequence()
+        .flatMap { day ->
+            val startDate = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptySequence()
+            day.sleeps.asSequence().map { startDate to it }
+        }
+        .mapNotNull { (startDate, entry) ->
+            val start = sleepStart(startDate, entry) ?: return@mapNotNull null
+            val end = sleepEnd(entry) ?: now
+            if (end <= dayStart || start >= dayEnd || end < start) return@mapNotNull null
+            val clippedStart = maxOf(start, dayStart)
+            val clippedEnd = minOf(end, dayEnd)
+            SleepSegment(
+                entry = entry,
+                startMinute = Duration.between(dayStart, clippedStart).toMinutes().toInt().coerceIn(0, 1440),
+                endMinute = Duration.between(dayStart, clippedEnd).toMinutes().toInt().coerceIn(0, 1440),
+                ongoing = sleepEnd(entry) == null,
+            )
+        }
+        .filter { it.endMinute > it.startMinute }
+        .sortedBy { it.startMinute }
+        .toList()
+}
+
+fun formatSleepDuration(minutes: Long): String = when {
+    minutes < 60 -> "$minutes мин"
+    minutes % 60 == 0L -> "${minutes / 60} ч"
+    else -> "${minutes / 60} ч ${minutes % 60} мин"
+}

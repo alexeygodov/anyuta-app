@@ -46,8 +46,12 @@ import androidx.compose.ui.unit.dp
 import ru.family.rasti.data.DayRecord
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.sleep.formatSleepDuration
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -242,6 +246,82 @@ internal fun MeasurementEditorDialog(
                 onClick = { onSave(initialDate, heightNumber, weightNumber, normalizedTime ?: time) },
                 enabled = validHeight && validWeight && (height.isNotBlank() || weight.isNotBlank()) && normalizedTime != null,
             ) { Text("Сохранить") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
+}
+
+@Composable
+internal fun SleepEditorDialog(
+    title: String,
+    initialStartDate: LocalDate,
+    initial: SleepEntry? = null,
+    requireEnd: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (LocalDate, String, LocalDate?, String?) -> Unit,
+) {
+    val now = remember { LocalDateTime.now().withSecond(0).withNano(0) }
+    val stateKey = "${initial?.id}-$initialStartDate-$requireEnd"
+    var startDate by rememberSaveable(stateKey) { mutableStateOf(initialStartDate) }
+    var startTime by rememberSaveable(stateKey) { mutableStateOf(initial?.startTime ?: currentTime()) }
+    var endDate by rememberSaveable(stateKey) {
+        mutableStateOf(initial?.endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: now.toLocalDate())
+    }
+    var endTime by rememberSaveable(stateKey) { mutableStateOf(initial?.endTime ?: currentTime()) }
+    var editingEnd by rememberSaveable(stateKey) { mutableStateOf(requireEnd) }
+    val normalizedStart = normalizeTimeToFiveMinutes(startTime)
+    val normalizedEnd = if (requireEnd) normalizeTimeToFiveMinutes(endTime) else null
+    val startDateTime = normalizedStart?.let { startDate.atTime(LocalTime.parse(it, timeFormatter)) }
+    val endDateTime = normalizedEnd?.let { endDate.atTime(LocalTime.parse(it, timeFormatter)) }
+    val durationMinutes = if (startDateTime != null && endDateTime != null) {
+        Duration.between(startDateTime, endDateTime).toMinutes().takeIf { it >= 0 }
+    } else {
+        null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (requireEnd) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (editingEnd) {
+                            OutlinedButton(onClick = { editingEnd = false }, modifier = Modifier.weight(1f)) { Text("Начало") }
+                            Button(onClick = {}, modifier = Modifier.weight(1f)) { Text("Конец") }
+                        } else {
+                            Button(onClick = {}, modifier = Modifier.weight(1f)) { Text("Начало") }
+                            OutlinedButton(onClick = { editingEnd = true }, modifier = Modifier.weight(1f)) { Text("Конец") }
+                        }
+                    }
+                }
+                Text(if (editingEnd) "Время пробуждения" else "Время засыпания", fontWeight = FontWeight.SemiBold)
+                DatePickerButton(
+                    date = if (editingEnd) endDate else startDate,
+                    onDateChange = { if (editingEnd) endDate = it else startDate = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    maximumDate = LocalDate.now(),
+                )
+                TimeInput(
+                    time = if (editingEnd) endTime else startTime,
+                    onTimeChange = { if (editingEnd) endTime = it else startTime = it },
+                )
+                if (requireEnd) {
+                    Text(
+                        durationMinutes?.let { "Длительность сна: ${formatSleepDuration(it)}" }
+                            ?: "Время пробуждения должно быть позже засыпания",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (durationMinutes == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(startDate, normalizedStart!!, endDate.takeIf { requireEnd }, normalizedEnd) },
+                enabled = normalizedStart != null && (!requireEnd || durationMinutes != null),
+            ) { Text(if (requireEnd) "Сохранить" else "Уснула") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )

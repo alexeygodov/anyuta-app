@@ -13,6 +13,7 @@ import ru.family.rasti.data.day
 import ru.family.rasti.sync.GitHubSync
 import ru.family.rasti.sync.decodeSyncState
 import ru.family.rasti.sync.encodeSyncState
+import ru.family.rasti.widget.AnyutaDashboardWidget
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -37,6 +38,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         checkVitamin(notifier, max, data, now)
         maybeSendDaySummary(max, data, now)
         maybeSyncInBackground(notifier, max, store, data)
+        AnyutaDashboardWidget.updateAll(applicationContext)
         return Result.success()
     }
 
