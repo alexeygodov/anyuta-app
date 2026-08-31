@@ -41,6 +41,8 @@ import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
+private const val FOREGROUND_SYNC_INTERVAL_MS = 15_000L
+
 class RastiViewModel(
     private val store: LocalStore,
     private val notifier: ReminderNotifier? = null,
@@ -65,8 +67,10 @@ class RastiViewModel(
         viewModelScope.launch {
             syncIfConfigured(showStatus = false)
             while (isActive) {
-                delay(60_000)
-                syncIfConfigured(showStatus = false)
+                delay(FOREGROUND_SYNC_INTERVAL_MS)
+                if (AppVisibility.inForeground) {
+                    syncIfConfigured(showStatus = false)
+                }
             }
         }
     }
