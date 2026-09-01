@@ -57,8 +57,11 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("История", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("Нажмите «Изменить», чтобы исправить запись, дату или время")
+            ScreenHeader(
+                eyebrow = "Дневник",
+                title = "История",
+                subtitle = "Кормления, сон, витамины и измерения по дням",
+            )
         }
         item { WeekReport(week) }
         if (days.isEmpty()) {

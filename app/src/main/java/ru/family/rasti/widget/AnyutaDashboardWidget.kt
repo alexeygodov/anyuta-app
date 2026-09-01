@@ -6,14 +6,12 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.widget.RemoteViews
 import ru.family.rasti.MainActivity
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.LocalStore
-import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.feeding.FeedingGuide
 import ru.family.rasti.feeding.SmartFeedingGuide
 import ru.family.rasti.sleep.activeSleep
@@ -54,15 +52,11 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         internal fun dashboardViews(context: Context, data: AppData): RemoteViews {
             val today = LocalDate.now()
             val now = LocalDateTime.now()
-            val day = data.days[today.toString()]
             val guide = FeedingGuide.calculate(data, today).guide
             val recommendation = SmartFeedingGuide.calculate(data, today, guide, now)
-            val consumed = day?.food.orEmpty().filter(::isMeasuredMilk).sumOf { it.amount }.toInt()
-            val progress = guide?.targetMl?.takeIf { it > 0 }?.let { (consumed * 100 / it).coerceIn(0, 100) } ?: 0
             val last = lastFeeding(data, now)
             val active = activeSleep(data)
             val lastCompleted = lastCompletedSleep(data, now)
-            val vitaminTaken = day?.vitamins.orEmpty().any(::isVitaminD)
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
             views.setTextViewText(
@@ -70,9 +64,6 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
                 today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))),
             )
             views.setTextViewText(R.id.widget_updated, "обновлено ${now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}")
-            views.setTextViewText(R.id.widget_progress_text, guide?.let { "$consumed / ${it.targetMl} мл" } ?: "$consumed мл")
-            views.setTextViewText(R.id.widget_progress_percent, guide?.let { "${consumed * 100 / it.targetMl}% цели" } ?: "без цели")
-            views.setProgressBar(R.id.widget_progress, 100, progress, guide == null)
             views.setTextViewText(
                 R.id.widget_recommendation,
                 recommendation?.let { "Расчётная порция: ${it.amountMl} мл" } ?: "Добавьте вес для расчёта порции",
@@ -81,27 +72,25 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
                 R.id.widget_last_feeding,
                 last?.let { (dateTime, entry) ->
                     val minutes = Duration.between(dateTime, now).toMinutes().coerceAtLeast(0)
-                    "🍼 ${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
-                } ?: "🍼 Кормлений пока нет",
+                    "Последнее кормление: ${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
+                } ?: "Последнее кормление: пока нет",
             )
             views.setTextViewText(
-                R.id.widget_sleep,
+                R.id.widget_last_sleep,
                 active?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "🌙 Спит ${formatSleepDuration(duration)}"
+                    "Сон сейчас: ${formatSleepDuration(duration)} · с ${it.entry.startTime}"
                 } ?: lastCompleted?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "🌙 Сон ${formatSleepDuration(duration)}"
-                } ?: "🌙 Сна пока нет",
+                    "Последний сон: ${formatSleepDuration(duration)} · до ${it.entry.endTime}"
+                } ?: "Последний сон: пока нет",
             )
-            views.setTextViewText(R.id.widget_vitamin, if (vitaminTaken) "● Витамин D принят" else "● Витамин D не принят")
-            views.setTextColor(R.id.widget_vitamin, if (vitaminTaken) Color.rgb(177, 232, 183) else Color.rgb(255, 174, 167))
+            views.setImageViewBitmap(R.id.widget_timeline, renderWidgetTimeline(data, today, now))
             views.setTextViewText(R.id.widget_sleep_action, if (active == null) "Уснула" else "Проснулась")
             views.setOnClickPendingIntent(R.id.widget_root, pendingIntent(context, null, 0))
             views.setOnClickPendingIntent(R.id.widget_milk_action, pendingIntent(context, WidgetAction.MILK, 1))
             views.setOnClickPendingIntent(R.id.widget_formula_action, pendingIntent(context, WidgetAction.FORMULA, 2))
             views.setOnClickPendingIntent(R.id.widget_sleep_action, pendingIntent(context, WidgetAction.SLEEP, 3))
-            views.setOnClickPendingIntent(R.id.widget_vitamin, pendingIntent(context, WidgetAction.VITAMIN_D, 4))
             return views
         }
 
@@ -132,11 +121,6 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         private fun isMeasuredMilk(entry: FoodEntry): Boolean =
             entry.unit.trim().lowercase() in setOf("мл", "ml") &&
                 entry.name.trim().lowercase() in setOf("молоко", "смесь")
-
-        private fun isVitaminD(entry: VitaminEntry): Boolean {
-            val name = entry.name.lowercase().replace("ё", "е")
-            return name.contains("витамин d") || name.contains("витамин д") || name.contains("d3")
-        }
 
         private fun agoText(minutes: Long): String = when {
             minutes < 1 -> "сейчас"

@@ -54,100 +54,95 @@
         android:background="@drawable/widget_panel_background"
         android:orientation="vertical"
         android:padding="10dp">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="bottom"
-            android:orientation="horizontal">
-            <TextView
-                android:id="@+id/widget_progress_text"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:includeFontPadding="false"
-                android:text="0 / 0 мл"
-                android:textColor="#FFFFFFFF"
-                android:textSize="21sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/widget_progress_percent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="0% цели"
-                android:textColor="#D9FFFFFF"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-        <ProgressBar
-            android:id="@+id/widget_progress"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="6dp"
-            android:layout_marginTop="6dp"
-            android:indeterminateTint="#FFA8E7B7"
-            android:max="100"
-            android:progressBackgroundTint="#38FFFFFF"
-            android:progressTint="#FFA8E7B7" />
-        <TextView
-            android:id="@+id/widget_recommendation"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:text="Расчётная порция"
-            android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
         <TextView
             android:id="@+id/widget_last_feeding"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
             android:text="Последнее кормление"
-            android:textColor="#CFFFFFFF"
-            android:textSize="11sp" />
+            android:textColor="#FFFFFFFF"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_recommendation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Расчётная порция"
+            android:textColor="#FFA8E7B7"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+        <TextView
+            android:id="@+id/widget_last_sleep"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Последний сон"
+            android:textColor="#FFDDE7FF"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:orientation="horizontal">
-        <TextView
-            android:id="@+id/widget_sleep"
-            android:layout_width="0dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_panel_background"
+        android:orientation="vertical"
+        android:paddingHorizontal="7dp"
+        android:paddingTop="7dp"
+        android:paddingBottom="3dp">
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_panel_background"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:padding="8dp"
-            android:text="Сон"
-            android:textColor="#FFDDE7FF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
-        <TextView
-            android:id="@+id/widget_vitamin"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_panel_background"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:padding="8dp"
-            android:text="Витамин D"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:includeFontPadding="false"
+                android:text="Сегодня · 24 часа"
+                android:textColor="#EFFFFFFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="● молоко"
+                android:textColor="#FF69C99E"
+                android:textSize="8sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:includeFontPadding="false"
+                android:text="● смесь"
+                android:textColor="#FFEEB169"
+                android:textSize="8sp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="7dp"
+                android:includeFontPadding="false"
+                android:text="━ сон"
+                android:textColor="#FF87A6EB"
+                android:textSize="8sp" />
+        </LinearLayout>
+        <ImageView
+            android:id="@+id/widget_timeline"
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:contentDescription="График кормлений и сна за сутки"
+            android:scaleType="fitXY" />
     </LinearLayout>
 
     <LinearLayout

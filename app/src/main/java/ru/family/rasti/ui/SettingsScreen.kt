@@ -113,7 +113,11 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text("Настройки", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            ScreenHeader(
+                eyebrow = "Анюта",
+                title = "Настройки",
+                subtitle = "Профиль, оформление, синхронизация и обновления",
+            )
         }
         item {
             SettingsCard("Оформление") {
@@ -445,7 +449,13 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
 
 @Composable
 private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
         Column(
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

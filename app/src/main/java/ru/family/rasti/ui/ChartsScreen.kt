@@ -79,8 +79,11 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     ) {
         item { WeeklyFeedingCard(data) }
         item {
-            Text("Графики роста", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-            Text("Коридор −2…+2 SD по стандартам WHO для детей до 5 лет")
+            ScreenHeader(
+                eyebrow = "Динамика",
+                title = "Рост и развитие",
+                subtitle = "Коридор −2…+2 SD по стандартам WHO для детей до 5 лет",
+            )
         }
         item {
             GrowthChartCard(data, standards, GrowthMetric.HEIGHT, "Рост", "см")
