@@ -32,11 +32,19 @@ private enum class AppScreen(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun RastiApp(viewModel: RastiViewModel) {
+fun RastiApp(
+    viewModel: RastiViewModel,
+    widgetAction: String? = null,
+    onWidgetActionConsumed: () -> Unit = {},
+) {
     var screenName by rememberSaveable { mutableStateOf(AppScreen.TODAY.name) }
     val screen = AppScreen.valueOf(screenName)
     val snackbar = remember { SnackbarHostState() }
     val message = viewModel.statusMessage
+
+    LaunchedEffect(widgetAction) {
+        if (widgetAction != null) screenName = AppScreen.TODAY.name
+    }
 
     LaunchedEffect(screen) {
         viewModel.syncIfConfigured(showStatus = false)
@@ -65,7 +73,12 @@ fun RastiApp(viewModel: RastiViewModel) {
         },
     ) { padding ->
         when (screen) {
-            AppScreen.TODAY -> TodayScreen(viewModel, Modifier.padding(padding))
+            AppScreen.TODAY -> TodayScreen(
+                viewModel = viewModel,
+                modifier = Modifier.padding(padding),
+                widgetAction = widgetAction,
+                onWidgetActionConsumed = onWidgetActionConsumed,
+            )
             AppScreen.HISTORY -> HistoryScreen(viewModel, Modifier.padding(padding))
             AppScreen.CHARTS -> ChartsScreen(viewModel, Modifier.padding(padding))
             AppScreen.SETTINGS -> SettingsScreen(viewModel, Modifier.padding(padding))

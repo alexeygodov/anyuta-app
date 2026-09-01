@@ -24,6 +24,16 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+object WidgetAction {
+    const val EXTRA = "ru.family.rasti.widget.ACTION"
+    const val MILK = "milk"
+    const val FORMULA = "formula"
+    const val SLEEP = "sleep"
+    const val VITAMIN_D = "vitamin_d"
+}
 
 class AnyutaDashboardWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -55,7 +65,13 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             val vitaminTaken = day?.vitamins.orEmpty().any(::isVitaminD)
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
+            views.setTextViewText(
+                R.id.widget_date,
+                today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))),
+            )
+            views.setTextViewText(R.id.widget_updated, "обновлено ${now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}")
             views.setTextViewText(R.id.widget_progress_text, guide?.let { "$consumed / ${it.targetMl} мл" } ?: "$consumed мл")
+            views.setTextViewText(R.id.widget_progress_percent, guide?.let { "${consumed * 100 / it.targetMl}% цели" } ?: "без цели")
             views.setProgressBar(R.id.widget_progress, 100, progress, guide == null)
             views.setTextViewText(
                 R.id.widget_recommendation,
@@ -65,30 +81,41 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
                 R.id.widget_last_feeding,
                 last?.let { (dateTime, entry) ->
                     val minutes = Duration.between(dateTime, now).toMinutes().coerceAtLeast(0)
-                    "Последнее: ${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
-                } ?: "Кормлений пока нет",
+                    "🍼 ${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
+                } ?: "🍼 Кормлений пока нет",
             )
             views.setTextViewText(
                 R.id.widget_sleep,
                 active?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "Сон: идёт ${formatSleepDuration(duration)}"
+                    "🌙 Спит ${formatSleepDuration(duration)}"
                 } ?: lastCompleted?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "Последний сон: ${formatSleepDuration(duration)}"
-                } ?: "Сон: записей нет",
+                    "🌙 Сон ${formatSleepDuration(duration)}"
+                } ?: "🌙 Сна пока нет",
             )
             views.setTextViewText(R.id.widget_vitamin, if (vitaminTaken) "● Витамин D принят" else "● Витамин D не принят")
             views.setTextColor(R.id.widget_vitamin, if (vitaminTaken) Color.rgb(177, 232, 183) else Color.rgb(255, 174, 167))
-            val intent = Intent(context, MainActivity::class.java)
-            val pendingIntent = PendingIntent.getActivity(
+            views.setTextViewText(R.id.widget_sleep_action, if (active == null) "Уснула" else "Проснулась")
+            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent(context, null, 0))
+            views.setOnClickPendingIntent(R.id.widget_milk_action, pendingIntent(context, WidgetAction.MILK, 1))
+            views.setOnClickPendingIntent(R.id.widget_formula_action, pendingIntent(context, WidgetAction.FORMULA, 2))
+            views.setOnClickPendingIntent(R.id.widget_sleep_action, pendingIntent(context, WidgetAction.SLEEP, 3))
+            views.setOnClickPendingIntent(R.id.widget_vitamin, pendingIntent(context, WidgetAction.VITAMIN_D, 4))
+            return views
+        }
+
+        private fun pendingIntent(context: Context, action: String?, requestCode: Int): PendingIntent {
+            val intent = Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                action?.let { putExtra(WidgetAction.EXTRA, it) }
+            }
+            return PendingIntent.getActivity(
                 context,
-                0,
+                requestCode,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
-            return views
         }
 
         private fun lastFeeding(data: AppData, now: LocalDateTime): Pair<LocalDateTime, FoodEntry>? =

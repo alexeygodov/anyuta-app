@@ -2,12 +2,16 @@ package ru.family.rasti
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -20,10 +24,14 @@ import ru.family.rasti.notify.ReminderScheduler
 import ru.family.rasti.ui.RastiApp
 import ru.family.rasti.ui.theme.RastiTheme
 import ru.family.rasti.widget.AnyutaDashboardWidget
+import ru.family.rasti.widget.WidgetAction
 
 class MainActivity : ComponentActivity() {
+    private var pendingWidgetAction by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingWidgetAction = intent?.getStringExtra(WidgetAction.EXTRA)
         ReminderScheduler.schedule(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -51,9 +59,22 @@ class MainActivity : ComponentActivity() {
                         isAppearanceLightNavigationBars = !darkTheme
                     }
                 }
-                RastiApp(viewModel)
+                RastiApp(
+                    viewModel = viewModel,
+                    widgetAction = pendingWidgetAction,
+                    onWidgetActionConsumed = {
+                        pendingWidgetAction = null
+                        intent?.removeExtra(WidgetAction.EXTRA)
+                    },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingWidgetAction = intent.getStringExtra(WidgetAction.EXTRA)
     }
 
     override fun onStart() {

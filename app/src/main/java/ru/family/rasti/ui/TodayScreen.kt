@@ -77,6 +77,7 @@ import ru.family.rasti.sleep.formatSleepDuration
 import ru.family.rasti.sleep.lastCompletedSleep
 import ru.family.rasti.sleep.sleepDurationMinutes
 import ru.family.rasti.sleep.sleepsForDate
+import ru.family.rasti.widget.WidgetAction
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -109,7 +110,12 @@ private data class SleepEditorState(
 )
 
 @Composable
-fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+fun TodayScreen(
+    viewModel: RastiViewModel,
+    modifier: Modifier = Modifier,
+    widgetAction: String? = null,
+    onWidgetActionConsumed: () -> Unit = {},
+) {
     var selectedDateRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     var lastSeenTodayRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -138,6 +144,36 @@ fun TodayScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     var measurementEditor by remember { mutableStateOf<MeasurementEditorState?>(null) }
     var sleepEditor by remember { mutableStateOf<SleepEditorState?>(null) }
     var note by remember(day.date, day.note) { mutableStateOf(day.note) }
+
+    LaunchedEffect(widgetAction) {
+        val action = widgetAction ?: return@LaunchedEffect
+        val today = LocalDate.now()
+        selectedDateRaw = today.toString()
+        when (action) {
+            WidgetAction.MILK, WidgetAction.FORMULA -> {
+                val guide = FeedingGuide.calculate(viewModel.data, today).guide
+                val recommendation = SmartFeedingGuide.calculate(viewModel.data, today, guide)
+                foodEditor = FoodEditorState(
+                    originalDate = today,
+                    fixedName = if (action == WidgetAction.MILK) "Молоко" else "Смесь",
+                    suggestedAmountMl = recommendation?.amountMl,
+                )
+            }
+            WidgetAction.SLEEP -> {
+                val active = activeSleep(viewModel.data)
+                sleepEditor = if (active == null) {
+                    SleepEditorState(today)
+                } else {
+                    SleepEditorState(active.startDate, active.entry, requireEnd = true)
+                }
+            }
+            WidgetAction.VITAMIN_D -> {
+                val existing = viewModel.day(today).vitamins.firstOrNull(::isVitaminD)
+                vitaminEditor = VitaminEditorState(today, existing, "Витамин D")
+            }
+        }
+        onWidgetActionConsumed()
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
