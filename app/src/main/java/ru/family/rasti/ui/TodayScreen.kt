@@ -76,6 +76,7 @@ import ru.family.rasti.sleep.activeSleep
 import ru.family.rasti.sleep.formatSleepDuration
 import ru.family.rasti.sleep.lastCompletedSleep
 import ru.family.rasti.sleep.sleepDurationMinutes
+import ru.family.rasti.sleep.sleepMinutesForDate
 import ru.family.rasti.sleep.sleepsForDate
 import ru.family.rasti.widget.WidgetAction
 import java.time.LocalDate
@@ -250,7 +251,7 @@ fun TodayScreen(
                 )
             }
         }
-        item { DaySummary(day) }
+        item { DaySummary(viewModel.data, day) }
         item { SectionHeader("Еда и питьё", onAdd = { foodEditor = FoodEditorState(selectedDate) }) }
         if (day.food.isEmpty()) {
             item { EmptyHint("Пока ничего не добавлено") }
@@ -721,7 +722,7 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
 }
 
 @Composable
-private fun DaySummary(day: DayRecord) {
+private fun DaySummary(data: AppData, day: DayRecord) {
     val totals = day.food.groupBy { it.unit }.mapValues { entry -> entry.value.sumOf { it.amount } }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
@@ -733,7 +734,7 @@ private fun DaySummary(day: DayRecord) {
             )
             Text("Витамины: ${day.vitamins.size}")
             val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
-            val sleepMinutes = date?.let { value -> day.sleeps.sumOf { sleepDurationMinutes(value, it) ?: 0L } } ?: 0L
+            val sleepMinutes = date?.let { sleepMinutesForDate(data, it) } ?: 0L
             Text(if (sleepMinutes > 0) "Сон: ${formatSleepDuration(sleepMinutes)}" else "Сон: нет записей")
         }
     }

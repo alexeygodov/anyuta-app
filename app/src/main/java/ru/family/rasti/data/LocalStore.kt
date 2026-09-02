@@ -69,6 +69,20 @@ class LocalStore(private val context: Context) {
         maxTokenStore.save(config.token.trim())
     }
 
+    fun loadNotificationPreferences(): NotificationPreferences = NotificationPreferences(
+        feedingReminders = settings.getBoolean("notification_feeding_reminders", true),
+        vitaminReminders = settings.getBoolean("notification_vitamin_reminders", true),
+        syncUpdates = settings.getBoolean("notification_sync_updates", true),
+    )
+
+    fun saveNotificationPreferences(preferences: NotificationPreferences) {
+        settings.edit {
+            putBoolean("notification_feeding_reminders", preferences.feedingReminders)
+            putBoolean("notification_vitamin_reminders", preferences.vitaminReminders)
+            putBoolean("notification_sync_updates", preferences.syncUpdates)
+        }
+    }
+
     fun loadAppTheme(): AppTheme = parseAppTheme(settings.getString("app_theme", null))
 
     fun saveAppTheme(theme: AppTheme) {

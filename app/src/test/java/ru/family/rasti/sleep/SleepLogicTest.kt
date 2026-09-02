@@ -31,6 +31,8 @@ class SleepLogicTest {
         assertEquals(1440, first.single().endMinute)
         assertEquals(0, second.single().startMinute)
         assertEquals(70, second.single().endMinute)
+        assertEquals(30L, sleepMinutesForDate(data, LocalDate.parse("2026-08-30")))
+        assertEquals(70L, sleepMinutesForDate(data, LocalDate.parse("2026-08-31")))
     }
 
     @Test

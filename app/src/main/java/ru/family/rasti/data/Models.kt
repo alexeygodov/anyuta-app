@@ -95,6 +95,12 @@ data class MaxConfig(
     fun isConfigured(): Boolean = enabled && token.isNotBlank() && chatId.toLongOrNull() != null
 }
 
+data class NotificationPreferences(
+    val feedingReminders: Boolean = true,
+    val vitaminReminders: Boolean = true,
+    val syncUpdates: Boolean = true,
+)
+
 fun AppData.day(date: LocalDate): DayRecord =
     days[date.toString()] ?: DayRecord(date = date.toString())
 

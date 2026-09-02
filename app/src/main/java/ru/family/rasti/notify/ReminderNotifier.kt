@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import ru.family.rasti.MainActivity
 import ru.family.rasti.R
+import ru.family.rasti.data.LocalStore
 
 private const val CHANNEL_ID = "reminders"
 private const val PREFS_NAME = "reminder_state"
@@ -61,6 +62,7 @@ class ReminderNotifier(private val context: Context) {
     }
 
     fun notifySyncUpdates(updates: List<SyncUpdate>) {
+        if (!LocalStore(context).loadNotificationPreferences().syncUpdates) return
         updates.forEach { update -> notify(nextSyncId(), update.title, update.text) }
     }
 

@@ -63,6 +63,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val currentProfile = viewModel.data.profile
+    val notificationPreferences = viewModel.notificationPreferences
     var childName by remember(currentProfile) { mutableStateOf(currentProfile.name) }
     var birthDate by remember(currentProfile) {
         mutableStateOf(runCatching { LocalDate.parse(currentProfile.birthDate) }.getOrDefault(LocalDate.now().minusYears(1)))
@@ -261,9 +262,42 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "После сохранения синхронизация идёт автоматически: при запуске, каждую минуту, после ввода данных и при переключении вкладок.",
+                    "После сохранения синхронизация идёт автоматически: при запуске, каждые 5 секунд при открытом приложении, после ввода данных и при переключении вкладок.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            SettingsCard("Уведомления на телефоне") {
+                Text(
+                    "Каждый тип можно отключить отдельно. Настройки сообщений в MAX находятся в следующем разделе.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                NotificationSettingRow(
+                    title = "Давно не было кормления",
+                    subtitle = "Напомнить, если прошло 3 часа",
+                    checked = notificationPreferences.feedingReminders,
+                    onCheckedChange = {
+                        viewModel.saveNotificationPreferences(notificationPreferences.copy(feedingReminders = it))
+                    },
+                )
+                NotificationSettingRow(
+                    title = "Витамин D",
+                    subtitle = "Напомнить после полудня, если не принят",
+                    checked = notificationPreferences.vitaminReminders,
+                    onCheckedChange = {
+                        viewModel.saveNotificationPreferences(notificationPreferences.copy(vitaminReminders = it))
+                    },
+                )
+                NotificationSettingRow(
+                    title = "Записи с другого телефона",
+                    subtitle = "Кормление, витамин и сон после синхронизации",
+                    checked = notificationPreferences.syncUpdates,
+                    onCheckedChange = {
+                        viewModel.saveNotificationPreferences(notificationPreferences.copy(syncUpdates = it))
+                    },
                 )
             }
         }
@@ -444,6 +478,30 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun NotificationSettingRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

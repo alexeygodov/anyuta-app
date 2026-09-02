@@ -78,6 +78,7 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { WeeklyFeedingCard(data) }
+        item { WeeklySleepCard(data) }
         item {
             ScreenHeader(
                 eyebrow = "Динамика",

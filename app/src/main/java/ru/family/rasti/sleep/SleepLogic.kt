@@ -73,6 +73,9 @@ fun sleepsForDate(data: AppData, date: LocalDate, now: LocalDateTime = LocalDate
         .toList()
 }
 
+fun sleepMinutesForDate(data: AppData, date: LocalDate, now: LocalDateTime = LocalDateTime.now()): Long =
+    sleepsForDate(data, date, now).sumOf { (it.endMinute - it.startMinute).toLong() }
+
 fun formatSleepDuration(minutes: Long): String = when {
     minutes < 60 -> "$minutes мин"
     minutes % 60 == 0L -> "${minutes / 60} ч"

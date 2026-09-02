@@ -19,6 +19,7 @@ import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.GitHubConfig
 import ru.family.rasti.data.LocalStore
 import ru.family.rasti.data.Measurement
+import ru.family.rasti.data.NotificationPreferences
 import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
@@ -55,6 +56,8 @@ class RastiViewModel(
     var maxConfig by mutableStateOf(store.loadMaxConfig())
         private set
     var appTheme by mutableStateOf(store.loadAppTheme())
+        private set
+    var notificationPreferences by mutableStateOf(store.loadNotificationPreferences())
         private set
     var syncing by mutableStateOf(false)
         private set
@@ -477,6 +480,11 @@ class RastiViewModel(
     fun selectAppTheme(theme: AppTheme) {
         appTheme = theme
         store.saveAppTheme(theme)
+    }
+
+    fun saveNotificationPreferences(preferences: NotificationPreferences) {
+        notificationPreferences = preferences
+        store.saveNotificationPreferences(preferences)
     }
 
     fun testMaxConnection(config: MaxConfig, onResult: (Boolean, String) -> Unit) {

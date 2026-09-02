@@ -33,40 +33,57 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val max = MaxMessenger(applicationContext)
         val store = LocalStore(applicationContext)
         val data = store.loadData()
+        val notificationPreferences = store.loadNotificationPreferences()
         val now = LocalDateTime.now()
-        checkFeeding(notifier, max, data, now)
-        checkVitamin(notifier, max, data, now)
+        checkFeeding(notifier, max, data, now, notificationPreferences.feedingReminders)
+        checkVitamin(notifier, max, data, now, notificationPreferences.vitaminReminders)
         maybeSendDaySummary(max, data, now)
         maybeSyncInBackground(notifier, max, store, data)
         AnyutaDashboardWidget.updateAll(applicationContext)
         return Result.success()
     }
 
-    private fun checkFeeding(notifier: ReminderNotifier, max: MaxMessenger, data: AppData, now: LocalDateTime) {
+    private fun checkFeeding(
+        notifier: ReminderNotifier,
+        max: MaxMessenger,
+        data: AppData,
+        now: LocalDateTime,
+        notifyOnPhone: Boolean,
+    ) {
         val last = feedingReminderDue(data, now) ?: return
         val key = last.toString()
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getString(KEY_FEEDING_NOTIFIED, null) == key) return
         val elapsed = formatElapsed(Duration.between(last, now).toMinutes())
-        notifier.notify(
-            ID_FEEDING_REMINDER,
-            "Пора покормить",
-            "Прошло $elapsed с последнего кормления",
-        )
+        if (notifyOnPhone) {
+            notifier.notify(
+                ID_FEEDING_REMINDER,
+                "Пора покормить",
+                "Прошло $elapsed с последнего кормления",
+            )
+        }
         runCatching { max.sendText("⏰ Прошло $elapsed с последнего кормления") }
         prefs.edit { putString(KEY_FEEDING_NOTIFIED, key) }
     }
 
-    private fun checkVitamin(notifier: ReminderNotifier, max: MaxMessenger, data: AppData, now: LocalDateTime) {
+    private fun checkVitamin(
+        notifier: ReminderNotifier,
+        max: MaxMessenger,
+        data: AppData,
+        now: LocalDateTime,
+        notifyOnPhone: Boolean,
+    ) {
         if (!vitaminReminderDue(data, now)) return
         val key = now.toLocalDate().toString()
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getString(KEY_VITAMIN_NOTIFIED, null) == key) return
-        notifier.notify(
-            ID_VITAMIN_REMINDER,
-            "Витамин D",
-            "Уже полдень, а витамин D сегодня ещё не принят",
-        )
+        if (notifyOnPhone) {
+            notifier.notify(
+                ID_VITAMIN_REMINDER,
+                "Витамин D",
+                "Уже полдень, а витамин D сегодня ещё не принят",
+            )
+        }
         runCatching { max.sendText("💊 Уже полдень, а витамин D сегодня ещё не принят") }
         prefs.edit { putString(KEY_VITAMIN_NOTIFIED, key) }
     }
