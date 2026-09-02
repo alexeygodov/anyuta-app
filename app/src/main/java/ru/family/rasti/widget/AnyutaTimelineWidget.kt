@@ -13,8 +13,6 @@ import ru.family.rasti.data.AppData
 import ru.family.rasti.data.LocalStore
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class AnyutaTimelineWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -35,14 +33,6 @@ class AnyutaTimelineWidget : AppWidgetProvider() {
             val today = LocalDate.now()
             val now = LocalDateTime.now()
             return RemoteViews(context.packageName, R.layout.widget_timeline).apply {
-                setTextViewText(
-                    R.id.widget_timeline_date,
-                    today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))),
-                )
-                setTextViewText(
-                    R.id.widget_timeline_updated,
-                    "обновлено ${now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}",
-                )
                 setImageViewBitmap(R.id.widget_timeline_image, renderWidgetTimeline(data, today, now))
                 setOnClickPendingIntent(R.id.widget_timeline_root, openAppIntent(context))
             }

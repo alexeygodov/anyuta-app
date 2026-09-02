@@ -25,8 +25,6 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 object WidgetAction {
     const val EXTRA = "ru.family.rasti.widget.ACTION"
@@ -64,11 +62,6 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             val vitamin = day?.vitamins.orEmpty().filter(::isVitaminD).maxByOrNull { it.time }
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
-            views.setTextViewText(
-                R.id.widget_date,
-                today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))),
-            )
-            views.setTextViewText(R.id.widget_updated, "обновлено ${now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"))}")
             views.setTextViewText(
                 R.id.widget_recommendation,
                 recommendation?.let { "Расчётная порция: ${it.amountMl} мл" } ?: "Добавьте вес для расчёта порции",
