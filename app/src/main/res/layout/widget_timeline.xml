@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_dashboard_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="8dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -25,7 +25,7 @@
                 android:includeFontPadding="false"
                 android:text="Лента дня"
                 android:textColor="#FFFFFFFF"
-                android:textSize="17sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -35,7 +35,7 @@
                 android:includeFontPadding="false"
                 android:text="сегодня"
                 android:textColor="#BFFFFFFF"
-                android:textSize="11sp" />
+                android:textSize="9sp" />
         </LinearLayout>
 
         <TextView
@@ -44,8 +44,8 @@
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_background"
             android:includeFontPadding="false"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="5dp"
+            android:paddingHorizontal="7dp"
+            android:paddingVertical="4dp"
             android:text="обновлено сейчас"
             android:textColor="#D9FFFFFF"
             android:textSize="9sp" />
@@ -53,13 +53,14 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="5dp"
+        android:layout_weight="1"
         android:background="@drawable/widget_panel_background"
         android:orientation="vertical"
-        android:paddingHorizontal="8dp"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp">
+        android:paddingHorizontal="7dp"
+        android:paddingTop="5dp"
+        android:paddingBottom="2dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -74,7 +75,7 @@
                 android:includeFontPadding="false"
                 android:text="Сегодня · 24 часа"
                 android:textColor="#EFFFFFFF"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -83,7 +84,7 @@
                 android:includeFontPadding="false"
                 android:text="● молоко"
                 android:textColor="#FF69C99E"
-                android:textSize="9sp" />
+                android:textSize="8sp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -92,7 +93,7 @@
                 android:includeFontPadding="false"
                 android:text="● смесь"
                 android:textColor="#FFEEB169"
-                android:textSize="9sp" />
+                android:textSize="8sp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -101,13 +102,15 @@
                 android:includeFontPadding="false"
                 android:text="━ сон"
                 android:textColor="#FF87A6EB"
-                android:textSize="9sp" />
+                android:textSize="8sp" />
         </LinearLayout>
 
         <ImageView
             android:id="@+id/widget_timeline_image"
             android:layout_width="match_parent"
-            android:layout_height="92dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:minHeight="58dp"
             android:contentDescription="График кормлений и сна за сутки"
             android:scaleType="fitXY" />
     </LinearLayout>
