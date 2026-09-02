@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Анюта</string>
-    <string name="widget_description">Интерактивный дашборд питания, сна и витамина D</string>
+    <string name="widget_dashboard_name">Анюта — сейчас</string>
+    <string name="widget_description">Кормление, расчётная порция, сон, витамин D и быстрый ввод</string>
+    <string name="widget_timeline_name">Анюта — график дня</string>
+    <string name="timeline_widget_description">Суточный график кормлений и сна</string>
 </resources>

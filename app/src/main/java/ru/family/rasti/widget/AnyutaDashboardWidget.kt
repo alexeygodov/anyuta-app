@@ -6,12 +6,15 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.widget.RemoteViews
 import ru.family.rasti.MainActivity
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.data.LocalStore
+import ru.family.rasti.data.VitaminEntry
+import ru.family.rasti.data.displayDose
 import ru.family.rasti.feeding.FeedingGuide
 import ru.family.rasti.feeding.SmartFeedingGuide
 import ru.family.rasti.sleep.activeSleep
@@ -44,19 +47,21 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, AnyutaDashboardWidget::class.java)
             val ids = manager.getAppWidgetIds(component)
-            if (ids.isEmpty()) return
             val data = LocalStore(context).loadData()
             ids.forEach { manager.updateAppWidget(it, dashboardViews(context, data)) }
+            AnyutaTimelineWidget.updateAll(context, data)
         }
 
         internal fun dashboardViews(context: Context, data: AppData): RemoteViews {
             val today = LocalDate.now()
             val now = LocalDateTime.now()
+            val day = data.days[today.toString()]
             val guide = FeedingGuide.calculate(data, today).guide
             val recommendation = SmartFeedingGuide.calculate(data, today, guide, now)
             val last = lastFeeding(data, now)
             val active = activeSleep(data)
             val lastCompleted = lastCompletedSleep(data, now)
+            val vitamin = day?.vitamins.orEmpty().filter(::isVitaminD).maxByOrNull { it.time }
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
             views.setTextViewText(
@@ -72,25 +77,33 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
                 R.id.widget_last_feeding,
                 last?.let { (dateTime, entry) ->
                     val minutes = Duration.between(dateTime, now).toMinutes().coerceAtLeast(0)
-                    "Последнее кормление: ${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
-                } ?: "Последнее кормление: пока нет",
+                    "${entry.name} ${entry.amount.toInt()} мл · ${agoText(minutes)}"
+                } ?: "Кормлений пока нет",
             )
             views.setTextViewText(
                 R.id.widget_last_sleep,
                 active?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "Сон сейчас: ${formatSleepDuration(duration)} · с ${it.entry.startTime}"
+                    "Спит ${formatSleepDuration(duration)} · с ${it.entry.startTime}"
                 } ?: lastCompleted?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "Последний сон: ${formatSleepDuration(duration)} · до ${it.entry.endTime}"
-                } ?: "Последний сон: пока нет",
+                    "${formatSleepDuration(duration)} · до ${it.entry.endTime}"
+                } ?: "Пока нет",
             )
-            views.setImageViewBitmap(R.id.widget_timeline, renderWidgetTimeline(data, today, now))
+            views.setTextViewText(
+                R.id.widget_vitamin,
+                vitamin?.let { "● ${it.displayDose()}" } ?: "● Не принят",
+            )
+            views.setTextColor(
+                R.id.widget_vitamin,
+                if (vitamin != null) Color.rgb(177, 232, 183) else Color.rgb(255, 174, 167),
+            )
             views.setTextViewText(R.id.widget_sleep_action, if (active == null) "Уснула" else "Проснулась")
             views.setOnClickPendingIntent(R.id.widget_root, pendingIntent(context, null, 0))
             views.setOnClickPendingIntent(R.id.widget_milk_action, pendingIntent(context, WidgetAction.MILK, 1))
             views.setOnClickPendingIntent(R.id.widget_formula_action, pendingIntent(context, WidgetAction.FORMULA, 2))
             views.setOnClickPendingIntent(R.id.widget_sleep_action, pendingIntent(context, WidgetAction.SLEEP, 3))
+            views.setOnClickPendingIntent(R.id.widget_vitamin_panel, pendingIntent(context, WidgetAction.VITAMIN_D, 4))
             return views
         }
 
@@ -121,6 +134,11 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         private fun isMeasuredMilk(entry: FoodEntry): Boolean =
             entry.unit.trim().lowercase() in setOf("мл", "ml") &&
                 entry.name.trim().lowercase() in setOf("молоко", "смесь")
+
+        private fun isVitaminD(entry: VitaminEntry): Boolean {
+            val name = entry.name.lowercase().replace("ё", "е")
+            return name.contains("витамин d") || name.contains("витамин д") || name.contains("d3")
+        }
 
         private fun agoText(minutes: Long): String = when {
             minutes < 1 -> "сейчас"

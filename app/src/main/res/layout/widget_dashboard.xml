@@ -5,26 +5,29 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_dashboard_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="13dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
+
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical">
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:text="Анюта"
                 android:textColor="#FFFFFFFF"
-                android:textSize="17sp"
+                android:textSize="19sp"
                 android:textStyle="bold" />
+
             <TextView
                 android:id="@+id/widget_date"
                 android:layout_width="wrap_content"
@@ -32,28 +35,30 @@
                 android:includeFontPadding="false"
                 android:text="сегодня"
                 android:textColor="#BFFFFFFF"
-                android:textSize="11sp" />
+                android:textSize="12sp" />
         </LinearLayout>
+
         <TextView
             android:id="@+id/widget_updated"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/widget_badge_background"
             android:includeFontPadding="false"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="5dp"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="6dp"
             android:text="обновлено сейчас"
-            android:textColor="#CFFFFFFF"
-            android:textSize="9sp" />
+            android:textColor="#D9FFFFFF"
+            android:textSize="10sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="9dp"
         android:background="@drawable/widget_panel_background"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="11dp">
+
         <TextView
             android:id="@+id/widget_last_feeding"
             android:layout_width="match_parent"
@@ -61,88 +66,23 @@
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="Последнее кормление"
+            android:text="Молоко 120 мл · 2 ч назад"
             android:textColor="#FFFFFFFF"
-            android:textSize="13sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/widget_recommendation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text="Расчётная порция"
+            android:text="Расчётная порция: 130 мл"
             android:textColor="#FFA8E7B7"
-            android:textSize="13sp"
+            android:textSize="15sp"
             android:textStyle="bold" />
-        <TextView
-            android:id="@+id/widget_last_sleep"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:ellipsize="end"
-            android:includeFontPadding="false"
-            android:maxLines="1"
-            android:text="Последний сон"
-            android:textColor="#FFDDE7FF"
-            android:textSize="12sp" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/widget_panel_background"
-        android:orientation="vertical"
-        android:paddingHorizontal="7dp"
-        android:paddingTop="7dp"
-        android:paddingBottom="3dp">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:includeFontPadding="false"
-                android:text="Сегодня · 24 часа"
-                android:textColor="#EFFFFFFF"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:includeFontPadding="false"
-                android:text="● молоко"
-                android:textColor="#FF69C99E"
-                android:textSize="8sp" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="7dp"
-                android:includeFontPadding="false"
-                android:text="● смесь"
-                android:textColor="#FFEEB169"
-                android:textSize="8sp" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="7dp"
-                android:includeFontPadding="false"
-                android:text="━ сон"
-                android:textColor="#FF87A6EB"
-                android:textSize="8sp" />
-        </LinearLayout>
-        <ImageView
-            android:id="@+id/widget_timeline"
-            android:layout_width="match_parent"
-            android:layout_height="92dp"
-            android:contentDescription="График кормлений и сна за сутки"
-            android:scaleType="fitXY" />
     </LinearLayout>
 
     <LinearLayout
@@ -150,10 +90,83 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_panel_background"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="ПОСЛЕДНИЙ СОН"
+                android:textColor="#AFC9D8FF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_last_sleep"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="1 ч 20 мин · до 14:30"
+                android:textColor="#FFDDE7FF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/widget_vitamin_panel"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_panel_background"
+            android:orientation="vertical"
+            android:padding="10dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:includeFontPadding="false"
+                android:text="ВИТАМИН D"
+                android:textColor="#AFFFFFFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_vitamin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="● Не принят"
+                android:textColor="#FFFFAEA7"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="9dp"
+        android:orientation="horizontal">
+
         <TextView
             android:id="@+id/widget_milk_action"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="42dp"
             android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_action_milk_background"
@@ -161,12 +174,13 @@
             android:includeFontPadding="false"
             android:text="＋ Молоко"
             android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/widget_formula_action"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="42dp"
             android:layout_marginHorizontal="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_action_formula_background"
@@ -174,12 +188,13 @@
             android:includeFontPadding="false"
             android:text="＋ Смесь"
             android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/widget_sleep_action"
             android:layout_width="0dp"
-            android:layout_height="38dp"
+            android:layout_height="42dp"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_action_sleep_background"
@@ -187,7 +202,7 @@
             android:includeFontPadding="false"
             android:text="Уснула"
             android:textColor="#FFFFFFFF"
-            android:textSize="12sp"
+            android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
 </LinearLayout>
