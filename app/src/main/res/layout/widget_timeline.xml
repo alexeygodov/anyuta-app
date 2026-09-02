@@ -107,7 +107,7 @@
         <ImageView
             android:id="@+id/widget_timeline_image"
             android:layout_width="match_parent"
-            android:layout_height="96dp"
+            android:layout_height="92dp"
             android:contentDescription="График кормлений и сна за сутки"
             android:scaleType="fitXY" />
     </LinearLayout>

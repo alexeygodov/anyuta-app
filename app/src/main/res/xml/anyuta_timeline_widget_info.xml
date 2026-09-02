@@ -3,7 +3,7 @@
     android:description="@string/timeline_widget_description"
     android:initialLayout="@layout/widget_timeline"
     android:minWidth="280dp"
-    android:minHeight="170dp"
+    android:minHeight="180dp"
     android:previewLayout="@layout/widget_timeline"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"

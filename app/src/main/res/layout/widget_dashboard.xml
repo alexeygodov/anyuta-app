@@ -95,7 +95,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
-            android:layout_weight="1"
+            android:layout_weight="1.65"
             android:background="@drawable/widget_panel_background"
             android:orientation="vertical"
             android:padding="10dp">
@@ -128,7 +128,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:layout_weight="1"
+            android:layout_weight="0.85"
             android:background="@drawable/widget_panel_background"
             android:orientation="vertical"
             android:padding="10dp">

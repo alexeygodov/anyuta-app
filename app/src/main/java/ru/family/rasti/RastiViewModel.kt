@@ -41,7 +41,7 @@ import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 
-private const val FOREGROUND_SYNC_INTERVAL_MS = 15_000L
+private const val FOREGROUND_SYNC_INTERVAL_MS = 5_000L
 
 class RastiViewModel(
     private val store: LocalStore,
