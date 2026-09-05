@@ -198,6 +198,7 @@ fun TodayScreen(
         }
         item {
             SleepControlCard(
+                wakeReminderMinutes = viewModel.wakeReminderMinutes,
                 data = viewModel.data,
                 selectedDate = selectedDate,
                 onStart = { sleepEditor = SleepEditorState(selectedDate) },
@@ -428,6 +429,7 @@ fun TodayScreen(
 
 @Composable
 private fun SleepControlCard(
+    wakeReminderMinutes: Int,
     data: AppData,
     selectedDate: LocalDate,
     onStart: () -> Unit,
@@ -443,6 +445,9 @@ private fun SleepControlCard(
     }
     val active = remember(data.days, minuteTick) { activeSleep(data) }
     val lastCompleted = remember(data.days, minuteTick) { lastCompletedSleep(data) }
+    val awake = remember(data.days, minuteTick) { ru.family.rasti.sleep.awakeMinutes(data) }
+    val attention = ru.family.rasti.sleep.wakeAttention(awake, wakeReminderMinutes)
+    val sleepInk = lerp(MaterialTheme.colorScheme.onTertiaryContainer, MaterialTheme.colorScheme.error, attention)
     val canStart = active == null && selectedDate <= LocalDate.now()
     val canWake = selectedDate <= LocalDate.now()
     val suggestedDuration = lastCompleted?.let { sleepDurationMinutes(it.startDate, it.entry)?.toInt() }
@@ -458,12 +463,20 @@ private fun SleepControlCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
-                Text(status, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Outlined.Bedtime, contentDescription = null, tint = sleepInk)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        awake?.let { "Бодрствует · ${formatSleepDuration(it)}" } ?: status,
+                        color = sleepInk, style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (awake != null) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    if (attention > 0f) Text("Дольше личного ориентира на ${formatSleepDuration(awake!! - wakeReminderMinutes)}", style = MaterialTheme.typography.bodySmall, color = sleepInk)
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = onStart, enabled = canStart, modifier = Modifier.weight(1f).height(52.dp)) {

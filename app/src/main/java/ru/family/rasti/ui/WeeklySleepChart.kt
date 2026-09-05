@@ -2,30 +2,24 @@ package ru.family.rasti.ui
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import ru.family.rasti.data.AppData
-import ru.family.rasti.sleep.SleepSegment
-import ru.family.rasti.sleep.formatSleepDuration
-import ru.family.rasti.sleep.sleepsForDate
+import ru.family.rasti.sleep.*
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -35,8 +29,9 @@ import kotlin.math.max
 internal data class DailySleepSummary(
     val date: LocalDate,
     val segments: List<SleepSegment>,
+    val awake: List<Pair<Int, Int>> = emptyList(),
 ) {
-    val totalMinutes: Long get() = segments.sumOf { (it.endMinute - it.startMinute).toLong() }
+    val totalMinutes: Long get() = mergedSleepSegments(segments).sumOf { (it.endMinute - it.startMinute).toLong() }
 }
 
 internal fun weeklySleepSummaries(
@@ -45,100 +40,88 @@ internal fun weeklySleepSummaries(
     now: LocalDateTime = LocalDateTime.now(),
 ): List<DailySleepSummary> = (6L downTo 0L).map { daysAgo ->
     val date = endDate.minusDays(daysAgo)
-    DailySleepSummary(date, sleepsForDate(data, date, now))
+    DailySleepSummary(date, mergedSleepSegments(sleepsForDate(data, date, now)), awakeSegmentsForDate(data, date, now))
 }
+
+private fun clockMinute(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)
+private fun shortDuration(minutes: Int) = if (minutes < 60) "${minutes}м" else "${minutes / 60}ч" + if (minutes % 60 == 0) "" else "${minutes % 60}"
 
 @Composable
 internal fun WeeklySleepCard(data: AppData) {
-    val points = remember(data.days) { weeklySleepSummaries(data) }
-    val sleepColor = Color(0xFF7C9EE8)
-    val axisColor = MaterialTheme.colorScheme.outlineVariant
-    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val columnColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .42f)
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) { while (true) { delay(60_000); now = LocalDateTime.now() } }
+    val points = remember(data.days, now) { weeklySleepSummaries(data, now.toLocalDate(), now) }
+    var selected by remember { mutableStateOf(6) }
+    var expanded by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val scroll = rememberScrollState()
+    LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    val formatter = remember { DateTimeFormatter.ofPattern("EE dd.MM", Locale.forLanguageTag("ru")) }
 
     Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Сон за 7 дней", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("■", color = sleepColor, style = MaterialTheme.typography.bodySmall)
-                Text(
-                    "Закрашено время, когда ребёнок спал",
-                    color = labelColor,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Canvas(Modifier.fillMaxWidth().height(310.dp)) {
-                val left = 38.dp.toPx()
-                val right = size.width - 7.dp.toPx()
-                val top = 12.dp.toPx()
-                val bottom = size.height - 38.dp.toPx()
-                val chartHeight = bottom - top
-                val slot = (right - left) / points.size
-                val columnWidth = slot * .58f
-                fun y(minute: Int): Float = top + minute.coerceIn(0, 1440) / 1440f * chartHeight
-
-                listOf(0, 360, 720, 1080, 1440).forEach { minute ->
-                    drawLine(
-                        color = axisColor,
-                        start = Offset(left, y(minute)),
-                        end = Offset(right, y(minute)),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                }
-                points.forEachIndexed { index, point ->
-                    val centerX = left + slot * (index + .5f)
-                    val x = centerX - columnWidth / 2f
-                    drawRoundRect(
-                        color = columnColor,
-                        topLeft = Offset(x, top),
-                        size = Size(columnWidth, chartHeight),
-                        cornerRadius = CornerRadius(7.dp.toPx()),
-                    )
-                    point.segments.forEach { segment ->
-                        val segmentTop = y(segment.startMinute)
-                        val segmentHeight = max(3.dp.toPx(), y(segment.endMinute) - segmentTop)
-                        drawRoundRect(
-                            color = sleepColor.copy(alpha = if (segment.ongoing) 1f else .86f),
-                            topLeft = Offset(x, segmentTop),
-                            size = Size(columnWidth, segmentHeight),
-                            cornerRadius = CornerRadius(5.dp.toPx()),
-                        )
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Сон и бодрствование", style = MaterialTheme.typography.titleLarge)
+            Text("■ Сон   ░ Бодрствование между записями", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
+                Canvas(Modifier.width(570.dp).height(440.dp).pointerInput(points) {
+                    detectTapGestures { position ->
+                        selected = ((position.x - 32.dp.toPx()) / 76.dp.toPx()).toInt().coerceIn(0, 6)
                     }
-                }
-
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = labelColor.toArgb()
-                    textSize = 10.dp.toPx()
-                }
-                val formatter = DateTimeFormatter.ofPattern("EE\ndd", Locale.forLanguageTag("ru"))
-                drawContext.canvas.nativeCanvas.apply {
-                    paint.textAlign = Paint.Align.RIGHT
+                }) {
+                    val left = 32.dp.toPx()
+                    val top = 26.dp.toPx()
+                    val bottom = size.height - 36.dp.toPx()
+                    val slot = 76.dp.toPx()
+                    val width = 66.dp.toPx()
+                    fun y(minute: Int) = top + minute / 1440f * (bottom - top)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 11.sp.toPx(); textAlign = Paint.Align.CENTER }
                     listOf(0, 360, 720, 1080, 1440).forEach { minute ->
-                        drawText("%02d".format(minute / 60), left - 6.dp.toPx(), y(minute) + 4.dp.toPx(), paint)
+                        drawLine(colors.outlineVariant, Offset(left, y(minute)), Offset(size.width, y(minute)), 1.dp.toPx())
+                        paint.color = colors.onSurfaceVariant.toArgb()
+                        drawContext.canvas.nativeCanvas.drawText("${minute / 60}", 12.dp.toPx(), y(minute) + 4.dp.toPx(), paint)
                     }
-                    paint.textAlign = Paint.Align.CENTER
                     points.forEachIndexed { index, point ->
-                        val x = left + slot * (index + .5f)
-                        val labels = point.date.format(formatter).split('\n')
-                        drawText(labels[0].replace(".", ""), x, bottom + 15.dp.toPx(), paint)
-                        drawText(labels[1], x, bottom + 29.dp.toPx(), paint)
+                        val x = left + slot * index + 4.dp.toPx()
+                        drawRoundRect(if (index == selected) colors.surfaceContainerHighest else colors.surfaceContainerLow,
+                            Offset(x, top), Size(width, bottom - top), CornerRadius(8.dp.toPx()))
+                        fun block(start: Int, end: Int, sleep: Boolean) {
+                            val blockHeight = max(2.dp.toPx(), y(end) - y(start))
+                            drawRoundRect(if (sleep) colors.tertiary else colors.secondaryContainer, Offset(x, y(start)),
+                                Size(width, blockHeight), CornerRadius(4.dp.toPx()))
+                            if (blockHeight >= 16.sp.toPx()) {
+                                paint.color = (if (sleep) colors.onTertiary else colors.onSecondaryContainer).toArgb()
+                                val baseline = (y(start) + y(end)) / 2 - (paint.ascent() + paint.descent()) / 2
+                                drawContext.canvas.nativeCanvas.drawText(shortDuration(end - start), x + width / 2, baseline, paint)
+                            }
+                        }
+                        point.awake.forEach { block(it.first, it.second, false) }
+                        point.segments.forEach { block(it.startMinute, it.endMinute, true) }
+                        paint.color = (if (index == selected) colors.primary else colors.onSurfaceVariant).toArgb()
+                        drawContext.canvas.nativeCanvas.apply {
+                            drawText(shortDuration(point.totalMinutes.toInt()), x + width / 2, 16.dp.toPx(), paint)
+                            drawText(point.date.format(DateTimeFormatter.ofPattern("dd.MM")), x + width / 2, bottom + 22.dp.toPx(), paint)
+                        }
                     }
                 }
             }
-            val today = points.last()
-            Text(
-                if (today.totalMinutes > 0) {
-                    "Сегодня: ${formatSleepDuration(today.totalMinutes)} сна."
-                } else {
-                    "Сегодня сон пока не записан."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "Сон через полночь делится между двумя днями по фактическому времени в каждом дне.",
-                style = MaterialTheme.typography.bodySmall,
-                color = labelColor,
-            )
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                points.forEachIndexed { index, point ->
+                    FilterChip(selected == index, { selected = index }, label = { Text(point.date.format(formatter)) })
+                }
+            }
+            val day = points[selected]
+            Text("Сон · ${formatSleepDuration(day.totalMinutes)}", style = MaterialTheme.typography.titleMedium)
+            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть интервалы" else "Все длительности дня") }
+            if (expanded) {
+                val rows = day.segments.map { Triple(it.startMinute, it.endMinute, true) } + day.awake.map { Triple(it.first, it.second, false) }
+                if (rows.isEmpty()) Text("Нет записей сна")
+                rows.sortedBy { it.first }.forEach { (start, end, sleep) ->
+                    Text("${clockMinute(start)}–${clockMinute(end)} · ${if (sleep) "Сон" else "Бодрствование ≈"} ${formatSleepDuration((end - start).toLong())}",
+                        style = MaterialTheme.typography.bodyMedium, color = if (sleep) colors.tertiary else colors.onSurfaceVariant)
+                }
+            }
+            Text("Листайте график вбок · сверху суммарный сон. Паузы — оценка по дневнику, пропущенный сон неизвестен. Пробелы более 12 часов не считаются бодрствованием. Через полночь длительности делятся по дням.",
+                style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
     }
 }

@@ -147,6 +147,23 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             }
         }
         item {
+            SettingsCard("Бодрствование") {
+                val minutes = viewModel.wakeReminderMinutes
+                Text(if (minutes == 0) "Подсветка выключена" else "Подсвечивать после ${ru.family.rasti.sleep.formatSleepDuration(minutes.toLong())}")
+                androidx.compose.material3.Slider(
+                    value = minutes.toFloat(),
+                    onValueChange = { viewModel.saveWakeReminderMinutes(kotlin.math.round(it / 5).toInt() * 5) },
+                    valueRange = 0f..300f,
+                    steps = 59,
+                )
+                Text(
+                    "Личный ориентир, не медицинская норма. По умолчанию 2 часа; настройте под ребёнка. После порога строка постепенно краснеет. Ноль — выключить. Настройка только на этом телефоне.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
             SettingsCard("Профиль ребёнка") {
                 OutlinedTextField(
                     childName,

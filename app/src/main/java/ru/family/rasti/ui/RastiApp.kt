@@ -70,7 +70,7 @@ fun RastiApp(
     val background = Brush.verticalGradient(
         listOf(
             MaterialTheme.colorScheme.background,
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = .16f),
+            androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.primaryContainer, .16f),
             MaterialTheme.colorScheme.background,
         ),
     )

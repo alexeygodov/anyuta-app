@@ -87,7 +87,7 @@ internal fun MilkIntakeChart(
     val surfaceColor = MaterialTheme.colorScheme.surface
     val plotColor = MaterialTheme.colorScheme.surfaceVariant
     val nowColor = MaterialTheme.colorScheme.error
-    val sleepColor = MaterialTheme.colorScheme.inversePrimary
+    val sleepColor = MaterialTheme.colorScheme.tertiary
     val points = remember(entries) { feedingPoints(entries) }
     val total = points.lastOrNull()?.cumulativeMl?.toDouble() ?: 0.0
     val milkTotal = points.filter(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }

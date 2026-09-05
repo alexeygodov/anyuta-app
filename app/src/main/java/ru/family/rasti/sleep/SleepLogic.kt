@@ -31,11 +31,12 @@ fun sleepDurationMinutes(startDate: LocalDate, entry: SleepEntry, now: LocalDate
     return Duration.between(start, end).toMinutes().takeIf { it >= 0 }
 }
 
-fun activeSleep(data: AppData): DatedSleep? = data.days.values.asSequence()
+fun activeSleep(data: AppData, now: LocalDateTime = LocalDateTime.now()): DatedSleep? = data.days.values.asSequence()
     .flatMap { day ->
         val date = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptySequence()
         day.sleeps.asSequence().filter { it.endDate == null || it.endTime == null }.map { DatedSleep(date, it) }
     }
+    .filter { sleepStart(it.startDate, it.entry)?.let { start -> start <= now } == true }
     .maxByOrNull { sleepStart(it.startDate, it.entry) ?: LocalDateTime.MIN }
 
 fun lastCompletedSleep(data: AppData, cutoff: LocalDateTime = LocalDateTime.now()): DatedSleep? =
@@ -74,7 +75,61 @@ fun sleepsForDate(data: AppData, date: LocalDate, now: LocalDateTime = LocalDate
 }
 
 fun sleepMinutesForDate(data: AppData, date: LocalDate, now: LocalDateTime = LocalDateTime.now()): Long =
-    sleepsForDate(data, date, now).sumOf { (it.endMinute - it.startMinute).toLong() }
+    mergedSleepSegments(sleepsForDate(data, date, now)).sumOf { (it.endMinute - it.startMinute).toLong() }
+
+/** Union overlapping records without changing the original entries used for editing. */
+fun mergedSleepSegments(segments: List<SleepSegment>): List<SleepSegment> =
+    segments.sortedBy { it.startMinute }.fold(mutableListOf<SleepSegment>()) { result, segment ->
+        val previous = result.lastOrNull()
+        if (previous != null && segment.startMinute <= previous.endMinute) {
+            result[result.lastIndex] = previous.copy(
+                endMinute = maxOf(previous.endMinute, segment.endMinute),
+                ongoing = previous.ongoing || segment.ongoing,
+            )
+        } else result.add(segment)
+        result
+    }
+
+fun awakeMinutes(data: AppData, now: LocalDateTime = LocalDateTime.now()): Long? {
+    if (activeSleep(data, now) != null) return null
+    val end = lastCompletedSleep(data, now)?.entry?.let(::sleepEnd) ?: return null
+    // A stale diary is not evidence that the child has been awake for days.
+    return Duration.between(end, now).toMinutes().takeIf { it in 0..720 }
+}
+
+fun wakeAttention(minutes: Long?, threshold: Int): Float =
+    if (minutes == null || threshold <= 0 || minutes <= threshold) 0f
+    else ((minutes - threshold) / 30f).coerceIn(0f, 1f)
+
+/** Gaps bounded by recorded sleep; long gaps are unknown rather than presumed wakefulness. */
+fun awakeSegmentsForDate(data: AppData, date: LocalDate, now: LocalDateTime): List<Pair<Int, Int>> {
+    val intervals = data.days.values.flatMap { day ->
+        val startDate = runCatching { LocalDate.parse(day.date) }.getOrNull() ?: return@flatMap emptyList()
+        day.sleeps.mapNotNull { entry ->
+            val start = sleepStart(startDate, entry) ?: return@mapNotNull null
+            val end = minOf(sleepEnd(entry) ?: now, now)
+            if (start < end) start to end else null
+        }
+    }.sortedBy { it.first }.fold(mutableListOf<Pair<LocalDateTime, LocalDateTime>>()) { merged, interval ->
+        val previous = merged.lastOrNull()
+        if (previous != null && interval.first <= previous.second) {
+            merged[merged.lastIndex] = previous.first to maxOf(previous.second, interval.second)
+        } else merged.add(interval)
+        merged
+    }
+    val gaps = intervals.zipWithNext().map { (first, second) -> first.second to second.first }.toMutableList()
+    intervals.lastOrNull()?.let { if (it.second < now) gaps.add(it.second to now) }
+    val dayStart = date.atStartOfDay()
+    val dayEnd = minOf(date.plusDays(1).atStartOfDay(), now)
+    return gaps.filter { Duration.between(it.first, it.second).toMinutes() in 1..720 }
+        .mapNotNull { (start, end) ->
+            val clippedStart = maxOf(start, dayStart)
+            val clippedEnd = minOf(end, dayEnd)
+            if (clippedStart >= clippedEnd) null else
+                Duration.between(dayStart, clippedStart).toMinutes().toInt() to
+                    Duration.between(dayStart, clippedEnd).toMinutes().toInt()
+        }
+}
 
 fun formatSleepDuration(minutes: Long): String = when {
     minutes < 60 -> "$minutes мин"

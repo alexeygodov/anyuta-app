@@ -59,9 +59,9 @@ internal fun weeklyFeedingSummaries(data: AppData, endDate: LocalDate = LocalDat
 @Composable
 internal fun WeeklyFeedingCard(data: AppData) {
     val points = remember(data) { weeklyFeedingSummaries(data) }
-    val milkColor = Color(0xFF2D8CFF)
-    val formulaColor = Color(0xFFFF9F43)
-    val rangeColor = MaterialTheme.colorScheme.primary
+    val milkColor = MaterialTheme.colorScheme.primary
+    val formulaColor = MaterialTheme.colorScheme.secondary
+    val rangeColor = MaterialTheme.colorScheme.tertiary
     val axisColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 

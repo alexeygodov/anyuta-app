@@ -13,6 +13,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -36,8 +43,6 @@ import kotlin.math.roundToInt
 private const val FILL_TOP_FRACTION = 0.275f
 private const val FILL_BOTTOM_FRACTION = 0.92f
 
-private val milkColor = Color(0xFFFFB04D)
-
 @Composable
 internal fun BottleAmountPicker(
     amountMl: Float,
@@ -51,6 +56,8 @@ internal fun BottleAmountPicker(
     val glassColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .5f)
     val tickColor = MaterialTheme.colorScheme.outline.copy(alpha = .65f)
     val numberColor = MaterialTheme.colorScheme.onSurface
+    val milkColor = MaterialTheme.colorScheme.secondaryContainer
+    val numberBackground = MaterialTheme.colorScheme.surface
     val currentOnChange by rememberUpdatedState(onAmountChange)
 
     fun snap(value: Float): Float =
@@ -61,10 +68,19 @@ internal fun BottleAmountPicker(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FilledTonalButton(onClick = { currentOnChange(snap(amountMl - stepMl)) }, enabled = amountMl > 0,
+            modifier = Modifier.semantics { contentDescription = "Уменьшить на $stepMl мл" }) { Text("−$stepMl") }
         Canvas(
             Modifier
-                .width(140.dp)
-                .height(260.dp)
+                .width(120.dp)
+                .height(230.dp)
+                .semantics {
+                    contentDescription = "Объём кормления"
+                    stateDescription = "${amountMl.roundToInt()} мл"
+                    progressBarRangeInfo = ProgressBarRangeInfo(amountMl, 0f..maxMl.toFloat(), maxMl / stepMl - 1)
+                    setProgress { currentOnChange(snap(it)); true }
+                }
                 .pointerInput(maxMl, stepMl) {
                     detectVerticalDragGestures { change, _ ->
                         change.consume()
@@ -177,16 +193,22 @@ internal fun BottleAmountPicker(
                 textAlign = Paint.Align.CENTER
             }
             val numberY = (bodyTop + bodyBottom) / 2 + 0.02f * h
+            // Opaque label stays legible both above and below the milk level, in either theme.
+            drawRoundRect(numberBackground, Offset(w * .18f, numberY - 40.sp.toPx()),
+                Size(w * .64f, 64.sp.toPx()), CornerRadius(12.dp.toPx()))
             drawContext.canvas.nativeCanvas.apply {
                 drawText("${amountMl.roundToInt()}", w / 2, numberY, numberPaint)
                 drawText("мл", w / 2, numberY + 0.075f * h, unitPaint)
             }
         }
+        FilledTonalButton(onClick = { currentOnChange(snap(amountMl + stepMl)) }, enabled = amountMl < maxMl,
+            modifier = Modifier.semantics { contentDescription = "Увеличить на $stepMl мл" }) { Text("+$stepMl") }
+        }
 
         val chips = suggestions.ifEmpty { listOf(60, 90, 120, 150) }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            chips.forEach { preset ->
-                AssistChip(onClick = { currentOnChange(preset.toFloat()) }, label = { Text("$preset") })
+            chips.distinct().take(4).forEach { preset ->
+                AssistChip(onClick = { currentOnChange(snap(preset.toFloat())) }, label = { Text("$preset") })
             }
         }
     }

@@ -92,8 +92,7 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             GrowthChartCard(data, standards, GrowthMetric.WEIGHT, "Вес", "кг")
         }
-        item { DevelopmentLeapCard(data.profile) }
-        item { GrowthVelocityCard(data, standards) }
+        item { MeasuredGrowthCard(data) }
         item {
             VaccinationTimelineCard(
                 data = data,

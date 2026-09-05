@@ -57,6 +57,14 @@ class RastiViewModel(
         private set
     var appTheme by mutableStateOf(store.loadAppTheme())
         private set
+    var wakeReminderMinutes by mutableStateOf(store.loadWakeReminderMinutes())
+        private set
+
+    fun saveWakeReminderMinutes(minutes: Int) {
+        wakeReminderMinutes = minutes.coerceIn(0, 300)
+        store.saveWakeReminderMinutes(wakeReminderMinutes)
+    }
+
     var notificationPreferences by mutableStateOf(store.loadNotificationPreferences())
         private set
     var syncing by mutableStateOf(false)

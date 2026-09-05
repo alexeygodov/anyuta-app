@@ -85,6 +85,12 @@ class LocalStore(private val context: Context) {
 
     fun loadAppTheme(): AppTheme = parseAppTheme(settings.getString("app_theme", null))
 
+    fun loadWakeReminderMinutes(): Int = settings.getInt("wake_reminder_minutes", 120).coerceIn(0, 300)
+
+    fun saveWakeReminderMinutes(minutes: Int) {
+        settings.edit { putInt("wake_reminder_minutes", minutes.coerceIn(0, 300)) }
+    }
+
     fun saveAppTheme(theme: AppTheme) {
         settings.edit { putString("app_theme", theme.name) }
     }
