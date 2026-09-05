@@ -40,4 +40,10 @@ class SleepAwakeTest {
         assertEquals(0f, wakeAttention(180, 0), .001f)
         assertEquals(0f, wakeAttention(null, 120), .001f)
     }
+
+    @Test fun activeSleepStopsWakeCounterAndFutureSleepDoesNotStartIt() {
+        val now = date.atTime(12, 0)
+        assertNull(awakeMinutes(data(SleepEntry(startTime = "11:00")), now))
+        assertNull(activeSleep(data(SleepEntry(startTime = "13:00")), now))
+    }
 }

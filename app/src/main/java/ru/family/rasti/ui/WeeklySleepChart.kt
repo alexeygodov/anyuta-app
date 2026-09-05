@@ -61,14 +61,27 @@ internal fun WeeklySleepCard(data: AppData) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Сон и бодрствование", style = MaterialTheme.typography.titleLarge)
-            Text("■ Сон   ░ Бодрствование между записями", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
-                Canvas(Modifier.width(570.dp).height(440.dp).pointerInput(points) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("■ Сон", style = MaterialTheme.typography.bodySmall, color = colors.tertiary)
+                Text("■ Бодрствование ≈", style = MaterialTheme.typography.bodySmall, color = colors.secondary)
+            }
+            Row(Modifier.fillMaxWidth()) {
+                Canvas(Modifier.width(28.dp).height(440.dp)) {
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        textSize = 11.sp.toPx(); textAlign = Paint.Align.CENTER; color = colors.onSurfaceVariant.toArgb()
+                    }
+                    listOf(0, 6, 12, 18, 24).forEach { hour ->
+                        val y = 26.dp.toPx() + hour / 24f * (size.height - 62.dp.toPx())
+                        drawContext.canvas.nativeCanvas.drawText("$hour", 12.dp.toPx(), y + 4.dp.toPx(), paint)
+                    }
+                }
+            Box(Modifier.weight(1f).horizontalScroll(scroll)) {
+                Canvas(Modifier.width(538.dp).height(440.dp).pointerInput(points) {
                     detectTapGestures { position ->
-                        selected = ((position.x - 32.dp.toPx()) / 76.dp.toPx()).toInt().coerceIn(0, 6)
+                        selected = ((position.x - 4.dp.toPx()) / 76.dp.toPx()).toInt().coerceIn(0, 6)
                     }
                 }) {
-                    val left = 32.dp.toPx()
+                    val left = 4.dp.toPx()
                     val top = 26.dp.toPx()
                     val bottom = size.height - 36.dp.toPx()
                     val slot = 76.dp.toPx()
@@ -77,8 +90,6 @@ internal fun WeeklySleepCard(data: AppData) {
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 11.sp.toPx(); textAlign = Paint.Align.CENTER }
                     listOf(0, 360, 720, 1080, 1440).forEach { minute ->
                         drawLine(colors.outlineVariant, Offset(left, y(minute)), Offset(size.width, y(minute)), 1.dp.toPx())
-                        paint.color = colors.onSurfaceVariant.toArgb()
-                        drawContext.canvas.nativeCanvas.drawText("${minute / 60}", 12.dp.toPx(), y(minute) + 4.dp.toPx(), paint)
                     }
                     points.forEachIndexed { index, point ->
                         val x = left + slot * index + 4.dp.toPx()
@@ -104,13 +115,18 @@ internal fun WeeklySleepCard(data: AppData) {
                     }
                 }
             }
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 points.forEachIndexed { index, point ->
                     FilterChip(selected == index, { selected = index }, label = { Text(point.date.format(formatter)) })
                 }
             }
             val day = points[selected]
-            Text("Сон · ${formatSleepDuration(day.totalMinutes)}", style = MaterialTheme.typography.titleMedium)
+            Text("${day.date.format(formatter)} · Сон ${formatSleepDuration(day.totalMinutes)}", style = MaterialTheme.typography.titleMedium)
+            if (day.awake.isNotEmpty()) Text(
+                "Бодрствование ≈ ${formatSleepDuration(day.awake.sumOf { (it.second - it.first).toLong() })}",
+                style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant,
+            )
             TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть интервалы" else "Все длительности дня") }
             if (expanded) {
                 val rows = day.segments.map { Triple(it.startMinute, it.endMinute, true) } + day.awake.map { Triple(it.first, it.second, false) }
@@ -119,8 +135,10 @@ internal fun WeeklySleepCard(data: AppData) {
                     Text("${clockMinute(start)}–${clockMinute(end)} · ${if (sleep) "Сон" else "Бодрствование ≈"} ${formatSleepDuration((end - start).toLong())}",
                         style = MaterialTheme.typography.bodyMedium, color = if (sleep) colors.tertiary else colors.onSurfaceVariant)
                 }
+                Text("Паузы — оценка по дневнику, пропущенный сон неизвестен. Пробелы более 12 часов не считаются бодрствованием. Через полночь длительности делятся по дням.",
+                    style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
-            Text("Листайте график вбок · сверху суммарный сон. Паузы — оценка по дневнику, пропущенный сон неизвестен. Пробелы более 12 часов не считаются бодрствованием. Через полночь длительности делятся по дням.",
+            Text("Листайте вбок · сверху суммарный сон · паузы оценены по записям.",
                 style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
     }

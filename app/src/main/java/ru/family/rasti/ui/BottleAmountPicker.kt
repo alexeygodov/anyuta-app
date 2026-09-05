@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
@@ -69,8 +70,8 @@ internal fun BottleAmountPicker(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        FilledTonalButton(onClick = { currentOnChange(snap(amountMl - stepMl)) }, enabled = amountMl > 0,
-            modifier = Modifier.semantics { contentDescription = "Уменьшить на $stepMl мл" }) { Text("−$stepMl") }
+        FilledTonalIconButton(onClick = { currentOnChange(snap(amountMl - stepMl)) }, enabled = amountMl > 0,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = "Уменьшить на $stepMl мл" }) { Text("−$stepMl") }
         Canvas(
             Modifier
                 .width(120.dp)
@@ -201,8 +202,8 @@ internal fun BottleAmountPicker(
                 drawText("мл", w / 2, numberY + 0.075f * h, unitPaint)
             }
         }
-        FilledTonalButton(onClick = { currentOnChange(snap(amountMl + stepMl)) }, enabled = amountMl < maxMl,
-            modifier = Modifier.semantics { contentDescription = "Увеличить на $stepMl мл" }) { Text("+$stepMl") }
+        FilledTonalIconButton(onClick = { currentOnChange(snap(amountMl + stepMl)) }, enabled = amountMl < maxMl,
+            modifier = Modifier.size(48.dp).semantics { contentDescription = "Увеличить на $stepMl мл" }) { Text("+$stepMl") }
         }
 
         val chips = suggestions.ifEmpty { listOf(60, 90, 120, 150) }
