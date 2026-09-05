@@ -148,6 +148,17 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         }
         item {
             SettingsCard("Бодрствование") {
+                val ageGuide = ru.family.rasti.sleep.wakeWindowGuide(currentProfile.birthDate)
+                val sourceUri = androidx.compose.ui.platform.LocalUriHandler.current
+                if (ageGuide != null) {
+                    Text("Возраст: ${ageGuide.ageMonths} полных мес. · ориентир ${ru.family.rasti.sleep.formatSleepDuration(ageGuide.minimumMinutes.toLong())} — ${ru.family.rasti.sleep.formatSleepDuration(ageGuide.maximumMinutes.toLong())}")
+                    Text("Предлагаемый порог: ${ru.family.rasti.sleep.formatSleepDuration(ageGuide.suggestedMinutes.toLong())} — середина диапазона, округлённая до 5 минут. Это способ настройки напоминания, не отдельная рекомендация врача.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { viewModel.saveWakeReminderMinutes(ageGuide.suggestedMinutes) }) { Text("Применить возрастной ориентир") }
+                } else {
+                    Text("Возрастной расчёт доступен от рождения до конца 12-го месяца. Проверьте дату рождения; для другого возраста задайте личный ориентир.", style = MaterialTheme.typography.bodySmall)
+                }
+                Text("Диапазоны Cleveland Clinic по возрасту от даты рождения. Следите за признаками усталости, а не только часами; для недоношенного ребёнка ориентир уточните у педиатра.", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { sourceUri.openUri("https://health.clevelandclinic.org/wake-windows-by-age") }) { Text("Источник и рекомендации") }
                 val minutes = viewModel.wakeReminderMinutes
                 Text(if (minutes == 0) "Подсветка выключена" else "Подсвечивать после ${ru.family.rasti.sleep.formatSleepDuration(minutes.toLong())}")
                 androidx.compose.material3.Slider(

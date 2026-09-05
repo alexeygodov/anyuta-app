@@ -326,6 +326,8 @@ class GitHubSync {
 
     private fun mergeDay(first: DayRecord, second: DayRecord): DayRecord {
         val firstNewer = first.updatedAt >= second.updatedAt
+        val moodSource = if (first.fussinessUpdatedAt > second.fussinessUpdatedAt ||
+            (first.fussinessUpdatedAt == second.fussinessUpdatedAt && (first.fussiness ?: -1) >= (second.fussiness ?: -1))) first else second
         val deletedFoodIds = first.deletedFoodIds + second.deletedFoodIds
         val deletedVitaminIds = first.deletedVitaminIds + second.deletedVitaminIds
         val deletedVaccinationIds = first.deletedVaccinationIds + second.deletedVaccinationIds
@@ -356,6 +358,8 @@ class GitHubSync {
             measurement = visibleMeasurement,
             measurementDeletedAt = measurementDeletedAt,
             note = if (firstNewer) first.note else second.note,
+            fussiness = moodSource.fussiness,
+            fussinessUpdatedAt = moodSource.fussinessUpdatedAt,
             updatedAt = maxOf(first.updatedAt, second.updatedAt),
         )
     }

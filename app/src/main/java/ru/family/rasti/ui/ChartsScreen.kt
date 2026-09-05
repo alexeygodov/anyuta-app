@@ -93,6 +93,7 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
             GrowthChartCard(data, standards, GrowthMetric.WEIGHT, "Вес", "кг")
         }
         item { MeasuredGrowthCard(data) }
+        item { DevelopmentCalendarCard(data, onFussinessChange = viewModel::saveFussiness) }
         item {
             VaccinationTimelineCard(
                 data = data,

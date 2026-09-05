@@ -13,6 +13,15 @@ import ru.family.rasti.data.SleepEntry
 import ru.family.rasti.data.VaccinationEntry
 
 class GitHubSyncTest {
+    @Test fun moodUsesOwnTimestampAndDeletionIsNotResurrected() {
+        val old = DayRecord("2026-09-05", fussiness = 2, fussinessUpdatedAt = "2026-09-05T10:00:00Z", updatedAt = "2026-09-05T15:00:00Z")
+        val cleared = old.copy(fussiness = null, fussinessUpdatedAt = "2026-09-05T12:00:00Z", updatedAt = "2026-09-05T12:00:00Z")
+        val local = AppData(days = mapOf(old.date to old))
+        val remote = AppData(days = mapOf(cleared.date to cleared))
+        assertNull(GitHubSync().merge(local, remote).days.getValue(old.date).fussiness)
+        assertNull(GitHubSync().merge(remote, local).days.getValue(old.date).fussiness)
+    }
+
     @Test
     fun merge_prefers_real_remote_profile_over_newer_placeholder() {
         val placeholder = ChildProfile(name = "Малыш", updatedAt = "2026-08-19T12:37:00Z")

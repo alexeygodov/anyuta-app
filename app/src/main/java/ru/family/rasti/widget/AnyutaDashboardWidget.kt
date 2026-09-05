@@ -7,6 +7,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.os.Bundle
+import android.os.Build
+import android.util.SizeF
+import android.util.TypedValue
+import android.view.View
 import android.widget.RemoteViews
 import ru.family.rasti.MainActivity
 import ru.family.rasti.R
@@ -37,7 +42,11 @@ object WidgetAction {
 class AnyutaDashboardWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         val data = LocalStore(context).loadData()
-        appWidgetIds.forEach { manager.updateAppWidget(it, dashboardViews(context, data)) }
+        appWidgetIds.forEach { manager.updateAppWidget(it, sizedViews(context, data, manager.getAppWidgetOptions(it))) }
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle) {
+        manager.updateAppWidget(appWidgetId, sizedViews(context, LocalStore(context).loadData(), newOptions))
     }
 
     companion object {
@@ -46,11 +55,24 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             val component = ComponentName(context, AnyutaDashboardWidget::class.java)
             val ids = manager.getAppWidgetIds(component)
             val data = LocalStore(context).loadData()
-            ids.forEach { manager.updateAppWidget(it, dashboardViews(context, data)) }
+            ids.forEach { manager.updateAppWidget(it, sizedViews(context, data, manager.getAppWidgetOptions(it))) }
             AnyutaTimelineWidget.updateAll(context, data)
         }
 
-        internal fun dashboardViews(context: Context, data: AppData): RemoteViews {
+        private fun sizedViews(context: Context, data: AppData, options: Bundle): RemoteViews {
+            if (Build.VERSION.SDK_INT >= 31) {
+                return RemoteViews(mapOf(
+                    SizeF(250f, 130f) to dashboardViews(context, data, 250, 130),
+                    SizeF(280f, 130f) to dashboardViews(context, data, 280, 130),
+                    SizeF(280f, 180f) to dashboardViews(context, data, 280, 180),
+                ))
+            }
+            return dashboardViews(context, data,
+                options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 280),
+                options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140))
+        }
+
+        internal fun dashboardViews(context: Context, data: AppData, width: Int = 280, height: Int = 140): RemoteViews {
             val today = LocalDate.now()
             val now = LocalDateTime.now()
             val day = data.days[today.toString()]
@@ -62,9 +84,23 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             val vitamin = day?.vitamins.orEmpty().filter(::isVitaminD).maxByOrNull { it.time }
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
+            val layout = dashboardLayout(width, height)
+            val padding = ((if (height < 150) 6 else 8) * context.resources.displayMetrics.density).toInt()
+            views.setViewPadding(R.id.widget_root, padding, padding, padding, padding)
+            listOf(R.id.widget_last_feeding, R.id.widget_last_sleep).forEach {
+                views.setTextViewTextSize(it, TypedValue.COMPLEX_UNIT_SP, layout.mainTextSp)
+                views.setInt(it, "setMaxLines", layout.maxLines)
+            }
+            val awake = ru.family.rasti.sleep.awakeMinutes(data, now)
+            views.setViewVisibility(R.id.widget_sleep_detail, if (layout.showSleepDetail && awake != null) View.VISIBLE else View.GONE)
+            views.setTextViewText(R.id.widget_sleep_detail, awake?.let { "Бодрствует ${formatSleepDuration(it)}" }.orEmpty())
+            val attention = ru.family.rasti.sleep.wakeAttention(awake, LocalStore(context).loadWakeReminderMinutes())
+            val sleepColor = androidx.core.graphics.ColorUtils.blendARGB(Color.rgb(220, 229, 255), Color.rgb(255, 150, 143), attention)
+            views.setTextColor(R.id.widget_last_sleep, sleepColor)
+            views.setTextColor(R.id.widget_sleep_detail, sleepColor)
             views.setTextViewText(
                 R.id.widget_recommendation,
-                recommendation?.let { "Расчётная порция: ${it.amountMl} мл" } ?: "Добавьте вес для расчёта порции",
+                recommendation?.let { "Порция: ${it.amountMl} мл" } ?: "Порция: нет расчёта",
             )
             views.setTextViewText(
                 R.id.widget_last_feeding,
@@ -80,15 +116,15 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
                     "Спит ${formatSleepDuration(duration)} · с ${it.entry.startTime}"
                 } ?: lastCompleted?.let {
                     val duration = sleepDurationMinutes(it.startDate, it.entry, now) ?: 0
-                    "${formatSleepDuration(duration)} · до ${it.entry.endTime}"
-                } ?: "Пока нет",
+                    "Сон ${formatSleepDuration(duration)} · до ${it.entry.endTime}"
+                } ?: "Сон пока не записан",
             )
             views.setTextViewText(
-                R.id.widget_vitamin,
-                vitamin?.let { "● ${it.displayDose()}" } ?: "● Не принят",
+                R.id.widget_vitamin_panel,
+                vitamin?.let { "D · ${it.displayDose()}" } ?: "D · не принят",
             )
             views.setTextColor(
-                R.id.widget_vitamin,
+                R.id.widget_vitamin_panel,
                 if (vitamin != null) Color.rgb(177, 232, 183) else Color.rgb(255, 174, 167),
             )
             views.setTextViewText(R.id.widget_sleep_action, if (active == null) "Уснула" else "Проснулась")

@@ -72,6 +72,8 @@ data class DayRecord(
     val measurement: Measurement? = null,
     val measurementDeletedAt: String? = null,
     val note: String = "",
+    val fussiness: Int? = null,
+    val fussinessUpdatedAt: String = "",
     val updatedAt: String = OffsetDateTime.now().toString(),
 )
 

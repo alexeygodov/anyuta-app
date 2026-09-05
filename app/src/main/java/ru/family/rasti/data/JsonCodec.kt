@@ -142,6 +142,8 @@ object JsonCodec {
         .apply { day.measurement?.let { put("measurement", measurementToJson(it)) } }
         .apply { day.measurementDeletedAt?.let { put("measurementDeletedAt", it) } }
         .put("note", day.note)
+        .apply { day.fussiness?.let { put("fussiness", it) } }
+        .put("fussinessUpdatedAt", day.fussinessUpdatedAt)
         .put("updatedAt", day.updatedAt)
 
     private fun dayFromJson(json: JSONObject): DayRecord {
@@ -162,6 +164,8 @@ object JsonCodec {
             measurement = json.optJSONObject("measurement")?.let(::measurementFromJson),
             measurementDeletedAt = json.optString("measurementDeletedAt").takeIf { it.isNotBlank() },
             note = json.optString("note"),
+            fussiness = if (json.has("fussiness")) json.optInt("fussiness", -1).takeIf { it in 0..2 } else null,
+            fussinessUpdatedAt = json.optString("fussinessUpdatedAt"),
             updatedAt = json.optString("updatedAt"),
         )
     }

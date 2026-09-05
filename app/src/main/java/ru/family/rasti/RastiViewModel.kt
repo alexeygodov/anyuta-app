@@ -418,6 +418,12 @@ class RastiViewModel(
         persist()
     }
 
+    fun saveFussiness(date: LocalDate, level: Int?) {
+        if (date > LocalDate.now() || (level != null && level !in 0..2)) return
+        data = data.updateDay(day(date).copy(fussiness = level, fussinessUpdatedAt = java.time.Instant.now().toString()))
+        persist()
+    }
+
     fun saveGitHubConfig(config: GitHubConfig, showStatus: Boolean = true) {
         val updated = config.copy(branch = config.branch.ifBlank { "main" })
         val previous = githubConfig
