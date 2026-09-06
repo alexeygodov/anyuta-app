@@ -16,7 +16,7 @@
         android:layout_marginHorizontal="2dp" android:background="@drawable/widget_action_sleep_background"
         android:text="Спит 1 ч\nс 14:30\nПроснулась" />
     <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardTile"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.85"
+        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
         android:layout_marginStart="2dp" android:background="@drawable/widget_vitamin_background"
         android:text="D\nНе принят\n＋" />
 </LinearLayout>

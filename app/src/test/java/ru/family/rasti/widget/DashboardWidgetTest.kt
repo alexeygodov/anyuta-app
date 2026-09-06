@@ -31,8 +31,11 @@ class DashboardWidgetTest {
     private fun render(width: Int, height: Int): View {
         val context = RuntimeEnvironment.getApplication()
         val view = AnyutaDashboardWidget.dashboardViews(context, data, width, height, now).apply(context, FrameLayout(context))
-        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
-        view.layout(0, 0, width, height)
+        // TextView auto-size requests another layout pass after choosing its font size.
+        repeat(3) {
+            view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, width, height)
+        }
         return view
     }
 
@@ -62,6 +65,7 @@ class DashboardWidgetTest {
                 (root as android.view.ViewGroup).offsetDescendantRectToMyCoords(tile, bounds)
                 assertTrue("Tile outside ${width}x$height: $bounds", bounds.left >= 0 && bounds.top >= 0 && bounds.right <= width && bounds.bottom <= height)
                 assertTrue("Tap target too short at ${width}x$height", tile.height >= 48)
+                assertTrue("Tap target too narrow at ${width}x$height", tile.width >= 48)
                 val textLayout = tile.layout
                 assertNotNull(textLayout)
                 assertTrue("Text clipped vertically at ${width}x$height: ${tile.text} (text ${textLayout.height}, tile ${tile.height})",
