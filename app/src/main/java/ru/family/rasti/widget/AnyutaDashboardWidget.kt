@@ -85,8 +85,9 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
 
             val views = RemoteViews(context.packageName, R.layout.widget_dashboard)
             val layout = dashboardLayout(width, height)
-            val padding = ((if (height < 150) 6 else 8) * context.resources.displayMetrics.density).toInt()
-            views.setViewPadding(R.id.widget_root, padding, padding, padding, padding)
+            val density = context.resources.displayMetrics.density
+            val padding = ((if (height < 150) 4 else 8) * density).toInt()
+            views.setViewPadding(R.id.widget_root, (8 * density).toInt(), padding, (8 * density).toInt(), padding)
             listOf(R.id.widget_last_feeding, R.id.widget_last_sleep).forEach {
                 views.setTextViewTextSize(it, TypedValue.COMPLEX_UNIT_SP, layout.mainTextSp)
                 views.setInt(it, "setMaxLines", layout.maxLines)

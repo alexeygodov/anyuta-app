@@ -40,7 +40,7 @@ class DashboardWidgetTest {
         val panel = view.findViewById<View>(R.id.widget_root)
         val milk = view.findViewById<View>(R.id.widget_milk_action)
         val row = milk.parent as View
-        assertTrue("Actions must fit the compact launcher slot", row.bottom + panel.paddingBottom <= 130)
+        assertTrue("Actions need ${row.bottom + panel.paddingBottom}px, available 130px", row.bottom + panel.paddingBottom <= 130)
         assertEquals(48, milk.height)
         assertEquals(view.findViewById<TextView>(R.id.widget_last_feeding).textSize,
             view.findViewById<TextView>(R.id.widget_last_sleep).textSize, .01f)
