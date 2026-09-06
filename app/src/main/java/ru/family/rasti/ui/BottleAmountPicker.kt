@@ -8,6 +8,9 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,7 +40,6 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -60,7 +62,6 @@ internal fun BottleAmountPicker(
     val numberColor = MaterialTheme.colorScheme.onSurface
     val milkColor = MaterialTheme.colorScheme.secondaryContainer
     val numberBackground = MaterialTheme.colorScheme.surface
-    val bottleHeight = if (LocalConfiguration.current.screenHeightDp < 700) 270.dp else 310.dp
     val currentOnChange by rememberUpdatedState(onAmountChange)
 
     fun snap(value: Float): Float =
@@ -71,13 +72,14 @@ internal fun BottleAmountPicker(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
         FilledTonalIconButton(onClick = { currentOnChange(snap(amountMl - stepMl)) }, enabled = amountMl > 0,
             modifier = Modifier.size(48.dp).semantics { contentDescription = "Уменьшить на $stepMl мл" }) { Text("−$stepMl") }
         Canvas(
             Modifier
-                .width(120.dp)
-                .height(bottleHeight)
+                .weight(1f, fill = false)
+                .widthIn(max = 168.dp)
+                .aspectRatio(140f / 260f)
                 .semantics {
                     contentDescription = "Объём кормления"
                     stateDescription = "${amountMl.roundToInt()} мл"

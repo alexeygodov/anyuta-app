@@ -13,6 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.xmlpull.v1.XmlPullParser
 import ru.family.rasti.R
 import ru.family.rasti.data.*
@@ -20,6 +21,7 @@ import java.time.LocalDateTime
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], qualifiers = "mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DashboardWidgetTest {
     private val now = LocalDateTime.parse("2026-09-06T22:33:00")
     private val data = AppData(profile = ChildProfile(birthDate = "2026-06-01"), days = mapOf(
