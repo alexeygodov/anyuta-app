@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:layout_marginBottom="2dp" android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_milk_action" style="@style/WidgetDashboardTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginEnd="2dp" android:background="@drawable/widget_action_milk_background" />
+        <TextView android:id="@+id/widget_formula_action" style="@style/WidgetDashboardTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginStart="2dp" android:background="@drawable/widget_action_formula_background" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:layout_marginTop="2dp" android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_sleep_action" style="@style/WidgetDashboardTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginEnd="2dp" android:background="@drawable/widget_action_sleep_background" />
+        <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginStart="2dp" android:background="@drawable/widget_vitamin_background" />
+    </LinearLayout>
+</LinearLayout>
