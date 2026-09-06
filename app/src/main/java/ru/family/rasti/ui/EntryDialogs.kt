@@ -3,6 +3,8 @@ package ru.family.rasti.ui
 import android.app.DatePickerDialog
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -97,7 +100,7 @@ internal fun FoodEditorDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (fixedName == null) {
                     OutlinedTextField(name, { name = it }, label = { Text("Название") }, singleLine = true)
                 }
@@ -433,10 +436,13 @@ internal fun DatePickerButton(
     maximumDate: LocalDate? = null,
 ) {
     val context = LocalContext.current
+    val dialogTheme = if (MaterialTheme.colorScheme.background.luminance() < .5f)
+        android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     OutlinedButton(
         onClick = {
             DatePickerDialog(
                 context,
+                dialogTheme,
                 { _, year, month, day -> onDateChange(LocalDate.of(year, month + 1, day)) },
                 date.year,
                 date.monthValue - 1,

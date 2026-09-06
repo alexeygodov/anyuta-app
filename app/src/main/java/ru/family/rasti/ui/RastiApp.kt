@@ -78,6 +78,7 @@ fun RastiApp(
     Scaffold(
         modifier = Modifier.background(background),
         containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {

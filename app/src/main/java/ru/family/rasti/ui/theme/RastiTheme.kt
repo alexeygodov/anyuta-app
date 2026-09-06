@@ -2,6 +2,8 @@ package ru.family.rasti.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -21,7 +23,7 @@ val Peach = Color(0xFFE2A477)
 val Sky = Color(0xFF91ACD8)
 val Ink = Color(0xFF1D2B26)
 
-private val lightColors = lightColorScheme(
+internal val lightColors = lightColorScheme(
     primary = Leaf,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFDCEFE5),
@@ -52,7 +54,7 @@ private val lightColors = lightColorScheme(
     error = Color(0xFFBA1A1A),
 )
 
-private val darkColors = darkColorScheme(
+internal val darkColors = darkColorScheme(
     primary = Color(0xFFA7D8BD),
     onPrimary = Color(0xFF173729),
     primaryContainer = Color(0xFF285040),
@@ -143,6 +145,8 @@ fun RastiTheme(darkTheme: Boolean = false, content: @Composable () -> Unit) {
         colorScheme = if (darkTheme) darkColors else lightColors,
         typography = appTypography,
         shapes = appShapes,
-        content = content,
+        content = {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) { content() }
+        },
     )
 }

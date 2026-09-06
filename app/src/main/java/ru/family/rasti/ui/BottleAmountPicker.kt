@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -59,6 +60,7 @@ internal fun BottleAmountPicker(
     val numberColor = MaterialTheme.colorScheme.onSurface
     val milkColor = MaterialTheme.colorScheme.secondaryContainer
     val numberBackground = MaterialTheme.colorScheme.surface
+    val bottleHeight = if (LocalConfiguration.current.screenHeightDp < 700) 270.dp else 310.dp
     val currentOnChange by rememberUpdatedState(onAmountChange)
 
     fun snap(value: Float): Float =
@@ -75,7 +77,7 @@ internal fun BottleAmountPicker(
         Canvas(
             Modifier
                 .width(120.dp)
-                .height(230.dp)
+                .height(bottleHeight)
                 .semantics {
                     contentDescription = "Объём кормления"
                     stateDescription = "${amountMl.roundToInt()} мл"
@@ -194,12 +196,12 @@ internal fun BottleAmountPicker(
                 textAlign = Paint.Align.CENTER
             }
             val numberY = (bodyTop + bodyBottom) / 2 + 0.02f * h
-            // Opaque label stays legible both above and below the milk level, in either theme.
-            drawRoundRect(numberBackground, Offset(w * .18f, numberY - 40.sp.toPx()),
+            // Translucent label lets the milk level show through while preserving contrast.
+            drawRoundRect(numberBackground.copy(alpha = .55f), Offset(w * .18f, numberY - 40.sp.toPx()),
                 Size(w * .64f, 64.sp.toPx()), CornerRadius(12.dp.toPx()))
             drawContext.canvas.nativeCanvas.apply {
                 drawText("${amountMl.roundToInt()}", w / 2, numberY, numberPaint)
-                drawText("мл", w / 2, numberY + 0.075f * h, unitPaint)
+                drawText("мл", w / 2, numberY + 22.sp.toPx(), unitPaint)
             }
         }
         FilledTonalIconButton(onClick = { currentOnChange(snap(amountMl + stepMl)) }, enabled = amountMl < maxMl,

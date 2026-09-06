@@ -706,7 +706,8 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .94f),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -716,7 +717,7 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             IconButton(onClick = onPrevious) { Icon(Icons.Outlined.ChevronLeft, "Предыдущий день") }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 val dayMonth = date.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru")))
                 Text(
                     when (date) {
@@ -726,8 +727,9 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
                     },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(date.format(DateTimeFormatter.ofPattern("EEEE, yyyy", Locale.forLanguageTag("ru"))))
+                Text(date.format(DateTimeFormatter.ofPattern("EEEE, yyyy", Locale.forLanguageTag("ru"))), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = onNext) { Icon(Icons.Outlined.ChevronRight, "Следующий день") }
         }
