@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_status_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_status_ok_background"
+    android:orientation="vertical"
+    android:padding="7dp">
+
+    <TextView
+        android:id="@+id/widget_status_title"
+        style="@style/WidgetStatusTitle"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical" />
+
+    <TextView
+        android:id="@+id/widget_status_detail"
+        style="@style/WidgetStatusDetail"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="5dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="42dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/widget_status_milk"
+            style="@style/WidgetDashboardAction"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="2dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_action_milk_background"
+            android:text="＋ Молоко" />
+
+        <TextView
+            android:id="@+id/widget_status_formula"
+            style="@style/WidgetDashboardAction"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginHorizontal="2dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_action_formula_background"
+            android:text="＋ Смесь" />
+
+        <TextView
+            android:id="@+id/widget_status_sleep"
+            style="@style/WidgetDashboardAction"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="2dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_action_sleep_background" />
+    </LinearLayout>
+</LinearLayout>

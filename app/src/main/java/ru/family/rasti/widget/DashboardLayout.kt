@@ -1,7 +1,11 @@
 package ru.family.rasti.widget
 
-internal enum class DashboardLayout { STRIP, GRID }
+internal enum class DashboardLayout { FULL, COMPACT, NARROW }
 
-/** One-row layouts remain genuinely one row; extra height changes structure, not padding. */
+/** Switch the content itself while the launcher controls the outer widget size. */
 internal fun dashboardLayout(width: Int, height: Int): DashboardLayout =
-    if (height >= 140 && width < height * 3) DashboardLayout.GRID else DashboardLayout.STRIP
+    when {
+        width < 230 -> DashboardLayout.NARROW
+        height < 132 -> DashboardLayout.COMPACT
+        else -> DashboardLayout.FULL
+    }

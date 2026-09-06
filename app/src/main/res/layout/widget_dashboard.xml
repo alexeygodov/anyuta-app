@@ -1,22 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One actual launcher row: four full-height action/data tiles. No hidden lower panel. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="horizontal" android:baselineAligned="false">
-    <TextView android:id="@+id/widget_milk_action" style="@style/WidgetDashboardTile"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.35"
-        android:layout_marginEnd="2dp" android:background="@drawable/widget_action_milk_background"
-        android:text="Молоко 120 мл\n1 ч назад\n＋ Молоко" />
-    <TextView android:id="@+id/widget_formula_action" style="@style/WidgetDashboardTile"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.1"
-        android:layout_marginHorizontal="2dp" android:background="@drawable/widget_action_formula_background"
-        android:text="Порция\n130 мл\n＋ Смесь" />
-    <TextView android:id="@+id/widget_sleep_action" style="@style/WidgetDashboardTile"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.35"
-        android:layout_marginHorizontal="2dp" android:background="@drawable/widget_action_sleep_background"
-        android:text="Спит 1 ч\nс 14:30\nПроснулась" />
-    <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardTile"
-        android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-        android:layout_marginStart="2dp" android:background="@drawable/widget_vitamin_background"
-        android:text="D\nНе принят\n＋" />
+    android:background="@drawable/widget_dashboard_background" android:orientation="vertical" android:padding="8dp">
+    <TextView android:id="@+id/widget_last_feeding" style="@style/WidgetDashboardPrimary"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" />
+    <TextView android:id="@+id/widget_recommendation" style="@style/WidgetDashboardSecondary"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:layout_marginTop="7dp" android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_last_sleep" style="@style/WidgetDashboardInfoTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.65"
+            android:layout_marginEnd="3dp" android:background="@drawable/widget_panel_background" android:gravity="center_vertical" />
+        <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardInfoTile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight=".85"
+            android:layout_marginStart="3dp" android:background="@drawable/widget_vitamin_background" android:gravity="center" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
+        android:layout_marginTop="7dp" android:orientation="horizontal" android:baselineAligned="false">
+        <TextView android:id="@+id/widget_milk_action" style="@style/WidgetDashboardAction"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginEnd="3dp" android:background="@drawable/widget_action_milk_background" android:text="＋ Молоко" />
+        <TextView android:id="@+id/widget_formula_action" style="@style/WidgetDashboardAction"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginHorizontal="3dp" android:background="@drawable/widget_action_formula_background" android:text="＋ Смесь" />
+        <TextView android:id="@+id/widget_sleep_action" style="@style/WidgetDashboardAction"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:layout_marginStart="3dp" android:background="@drawable/widget_action_sleep_background" />
+    </LinearLayout>
 </LinearLayout>

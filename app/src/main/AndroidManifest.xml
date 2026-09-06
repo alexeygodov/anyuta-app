@@ -44,6 +44,28 @@
                 android:resource="@xml/anyuta_widget_info" />
         </receiver>
         <receiver
+            android:name=".widget.AnyutaStatusWidget"
+            android:exported="false"
+            android:label="@string/widget_status_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/anyuta_status_widget_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.AnyutaQuickWidget"
+            android:exported="false"
+            android:label="@string/widget_quick_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/anyuta_quick_widget_info" />
+        </receiver>
+        <receiver
             android:name=".widget.AnyutaTimelineWidget"
             android:exported="false"
             android:label="@string/widget_timeline_name">

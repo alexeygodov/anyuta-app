@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Анюта</string>
-    <string name="widget_dashboard_name">Анюта — сейчас</string>
-    <string name="widget_description">Одна строка 4×1 или сетка: кормление, порция, сон, витамин D. Каждый блок — кнопка ввода.</string>
+    <string name="widget_dashboard_name">Анюта — дашборд</string>
+    <string name="widget_description">Адаптивный дашборд: кормление, расчётная порция, сон, витамин D и быстрые действия.</string>
+    <string name="widget_status_name">Анюта — состояние</string>
+    <string name="widget_status_description">Крупный сигнал: пора кормить, отдыхать или ребёнок спит; кнопки ввода рядом.</string>
+    <string name="widget_quick_name">Анюта — быстрый ввод</string>
+    <string name="widget_quick_description">Четыре крупные кнопки: молоко, смесь, сон и витамин D.</string>
     <string name="widget_timeline_name">Анюта — график дня</string>
     <string name="timeline_widget_description">Суточный график кормлений и сна</string>
 </resources>
