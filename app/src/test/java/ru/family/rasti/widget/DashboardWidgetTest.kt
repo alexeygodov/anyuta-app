@@ -63,7 +63,7 @@ class DashboardWidgetTest {
         val ns = "http://schemas.android.com/apk/res/android"
         assertEquals(4, parser.getAttributeIntValue(ns, "targetCellWidth", 0))
         assertEquals(2, parser.getAttributeIntValue(ns, "targetCellHeight", 0))
-        assertEquals("horizontal|vertical", parser.getAttributeValue(ns, "resizeMode"))
+        assertEquals(3, parser.getAttributeIntValue(ns, "resizeMode", 0))
         val attributes = context.obtainStyledAttributes(
             Xml.asAttributeSet(parser),
             intArrayOf(android.R.attr.minResizeWidth, android.R.attr.minResizeHeight),
