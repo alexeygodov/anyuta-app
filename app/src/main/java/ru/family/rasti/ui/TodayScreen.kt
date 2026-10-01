@@ -570,10 +570,8 @@ private fun MilkProgressCard(
     val milkEntries = day.food
         .filter { it.unit.trim().lowercase() in setOf("мл", "ml") }
         .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
-    val consumed = milkEntries.sumOf { it.amount }
     val result = FeedingGuide.calculate(data, date)
     val guide = result.guide
-    val progressToMinimum = guide?.let { (consumed / it.minimumMl).toFloat().coerceIn(0f, 1f) }
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = neutralCardColors(),
@@ -593,14 +591,7 @@ private fun MilkProgressCard(
             val smartRecommendation = remember(current, date, data.days, guide) {
                 SmartFeedingGuide.calculate(data, date, guide, current)
             }
-            progressToMinimum?.let { progress ->
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = { progress }, modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.primaryContainer,
-                )
-                Text("${(progress * 100).toInt()}% минимального ориентира", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+
             lastFeeding?.let { LastFeedingLabel(it) }
             smartRecommendation?.let { SmartFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

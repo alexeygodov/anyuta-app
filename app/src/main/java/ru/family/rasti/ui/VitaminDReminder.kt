@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.lerp
 import android.os.Build
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -88,21 +89,22 @@ internal fun rememberReminderTime(clock: Clock? = null): LocalDateTime {
 
 @Composable
 internal fun VitaminDReminder(shouldPulse: Boolean, onClick: () -> Unit) {
-    // Keeping the transition in this branch disposes it immediately at the time boundary.
-    val borderAlpha = if (shouldPulse) {
+    // Dispose the animation at 14:00. Keep text fully opaque in both states.
+    val pulse = if (shouldPulse) {
         val transition = rememberInfiniteTransition(label = "vitamin-d-reminder")
-        val alpha by transition.animateFloat(.45f, 1f,
-            infiniteRepeatable(tween(480), RepeatMode.Reverse), label = "vitamin-d-border")
-        alpha
-    } else 1f
+        val value by transition.animateFloat(0f, 1f,
+            infiniteRepeatable(tween(480), RepeatMode.Reverse), label = "vitamin-d-pulse")
+        value
+    } else 0f
+    val colors = MaterialTheme.colorScheme
     FilledTonalButton(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().heightIn(min = 88.dp).testTag("vitamin-d-reminder")
             .semantics { stateDescription = if (shouldPulse) "Напоминание до 14:00" else "Статичное напоминание" },
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.error.copy(alpha = borderAlpha)),
+        border = BorderStroke(2.dp, colors.error.copy(alpha = if (shouldPulse) .45f + .55f * pulse else 1f)),
         colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            containerColor = lerp(colors.errorContainer, colors.error, .18f * pulse),
+            contentColor = colors.onErrorContainer,
         ),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

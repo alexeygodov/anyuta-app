@@ -16,7 +16,7 @@ import ru.family.rasti.ui.theme.lightColors
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class ThemeContrastTest {
-    @Test fun actualTextPairsAndOpaqueBottleMeetContrastFloor() {
+    @Test fun actualTextPairsAndTranslucentFillsMeetContrastFloor() {
         listOf(lightColors, darkColors).forEach { colors ->
             val pairs = listOf(
                 colors.onBackground to colors.background,
@@ -44,21 +44,28 @@ class ThemeContrastTest {
                 listOf(colors.surface, colors.surfaceContainerLow).flatMap { surface ->
                     listOf(colors.primary, colors.secondary, colors.tertiary, colors.error).map { it to surface }
                 }
-            actualPairs.forEach { (text, background) ->
+            val bottleBackgrounds = listOf(colors.surfaceVariant, colors.secondaryContainer).map { beneath ->
+                colors.surface.copy(alpha = .55f).compositeOver(beneath)
+            }
+            val summaryBackground = colors.primary.copy(alpha = .16f).compositeOver(colors.surface)
+            val compositedPairs = actualPairs + bottleBackgrounds.flatMap { background ->
+                listOf(colors.onSurface to background, colors.onSurfaceVariant to background)
+            } + listOf(colors.onSurface to summaryBackground, colors.onSurfaceVariant to summaryBackground)
+            compositedPairs.forEach { (text, background) ->
                 val contrast = ColorUtils.calculateContrast(text.toArgb(), background.toArgb())
                 assertTrue("Contrast $contrast below 4.5: $text on $background", contrast >= 4.5)
             }
         }
     }
-    @Test fun vitaminTextIsOpaqueInBothModesAndEveryBorderPhase() {
+    @Test fun vitaminTextIsReadableInBothModesAndEveryPulsePhase() {
         listOf(lightColors, darkColors).forEach { colors ->
             listOf(false, true).forEach { shouldPulse ->
                 listOf(0f, .25f, .5f, .75f, 1f).forEach { phase ->
                     val borderAlpha = if (shouldPulse) .45f + .55f * phase else 1f
-                    val border = colors.error.copy(alpha = borderAlpha).compositeOver(colors.errorContainer)
-                    // The border is decorative; it never changes either layer behind the text.
+                    val background = lerp(colors.errorContainer, colors.error, if (shouldPulse) .18f * phase else 0f)
+                        .compositeOver(colors.background)
+                    val border = colors.error.copy(alpha = borderAlpha).compositeOver(background)
                     assertTrue(border.alpha == 1f)
-                    val background = colors.errorContainer.compositeOver(colors.background)
                     val foreground = colors.onErrorContainer.compositeOver(background)
                     assertTrue(ColorUtils.calculateContrast(foreground.toArgb(), background.toArgb()) >= 4.5)
                 }

@@ -63,7 +63,7 @@ internal fun BottleAmountPicker(
     val unitColor = MaterialTheme.colorScheme.onSurfaceVariant
     val milkColor = MaterialTheme.colorScheme.secondaryContainer
     val numberSize = MaterialTheme.typography.headlineLarge.fontSize
-    val numberBackground = MaterialTheme.colorScheme.surface
+    val numberBackground = MaterialTheme.colorScheme.surface.copy(alpha = .55f)
     val currentOnChange by rememberUpdatedState(onAmountChange)
 
     fun snap(value: Float): Float =
@@ -200,7 +200,7 @@ internal fun BottleAmountPicker(
                 textAlign = Paint.Align.CENTER
             }
             val numberY = (bodyTop + bodyBottom) / 2 + 0.02f * h
-            // Opaque label preserves the same contrast at every milk level.
+            // The milk level remains visible beneath the label; text contrast is checked at every fill state.
             drawRoundRect(numberBackground, Offset(w * .18f, numberY - 40.sp.toPx()),
                 Size(w * .64f, 64.sp.toPx()), CornerRadius(12.dp.toPx()))
             drawContext.canvas.nativeCanvas.apply {

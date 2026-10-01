@@ -125,6 +125,22 @@ class ScreenScreenshotTest {
     @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
     fun bottleDark320Normal() = captureProfile("bottle", true, 320, 1f)
     @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun milkSummaryLight360Normal() = captureProfile("milk-summary", false, 360, 1f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun milkSummaryLight320Large() = captureProfile("milk-summary", false, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun milkSummaryLight360Large() = captureProfile("milk-summary", false, 360, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun milkSummaryLight320Normal() = captureProfile("milk-summary", false, 320, 1f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun milkSummaryDark360Normal() = captureProfile("milk-summary", true, 360, 1f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun milkSummaryDark320Large() = captureProfile("milk-summary", true, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun milkSummaryDark360Large() = captureProfile("milk-summary", true, 360, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun milkSummaryDark320Normal() = captureProfile("milk-summary", true, 320, 1f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
     fun recoveryLight360Normal() = captureProfile("recovery", false, 360, 1f)
     @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
     fun recoveryLight320Large() = captureProfile("recovery", false, 320, 1.3f)
@@ -281,6 +297,21 @@ class ScreenScreenshotTest {
                                     "settings" -> SettingsScreen(model, clock = clock)
                                     "app" -> RastiApp(model, clock = clock)
                                     "bottle" -> BottleAmountPicker(100f, {})
+                                    "milk-summary" -> Column(Modifier.padding(16.dp)) {
+                                        Text("Питание за сутки", style = MaterialTheme.typography.titleMedium)
+                                        MilkIntakeChart(
+                                            entries = listOf(
+                                                FoodEntry(id = "milk", time = "08:00", name = "Молоко", amount = 100.0, unit = "мл"),
+                                                FoodEntry(id = "formula", time = "12:00", name = "Смесь", amount = 100.0, unit = "мл"),
+                                            ),
+                                            date = date,
+                                            minimumMl = 300,
+                                            targetMl = 400,
+                                            maximumMl = 500,
+                                            onEntryClick = {},
+                                            now = java.time.LocalDateTime.of(2026, 9, 12, 14, 0),
+                                        )
+                                    }
                                     "recovery" -> StorageRecoveryScreen(true, {})
                                     "storage-error" -> StorageRecoveryScreen(false, {})
                                     "food-dialog" -> FoodEditorDialog("Смесь", date,

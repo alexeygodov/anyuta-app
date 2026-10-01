@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -64,7 +63,6 @@ internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now
     val points = remember(data, endDate) { weeklyFeedingSummaries(data, endDate) }
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
-    val onFormulaColor = MaterialTheme.colorScheme.onSecondary
     val rangeColor = MaterialTheme.colorScheme.tertiary
     val axisColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -74,7 +72,7 @@ internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now
             Text("Питание за 7 дней", style = MaterialTheme.typography.titleLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("● Молоко", color = milkColor, style = MaterialTheme.typography.bodySmall)
-                Text("▧ Смесь", color = formulaColor, style = MaterialTheme.typography.bodySmall)
+                Text("■ Смесь", color = formulaColor, style = MaterialTheme.typography.bodySmall)
                 Text("▥ Норма", color = rangeColor, style = MaterialTheme.typography.bodySmall)
             }
             Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(240.dp)) {
@@ -122,14 +120,6 @@ internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now
                             topLeft = Offset(centerX - barWidth / 2f, y(point.formulaMl)),
                             size = Size(barWidth, bottom - y(point.formulaMl)),
                         )
-                        // Hatch formula bars so the two series remain distinct without colour.
-                        clipRect(centerX - barWidth / 2f, y(point.formulaMl), centerX + barWidth / 2f, bottom) {
-                            var stripeY = y(point.formulaMl) - barWidth
-                            while (stripeY < bottom) {
-                                drawLine(onFormulaColor, Offset(centerX - barWidth / 2f, stripeY + barWidth), Offset(centerX + barWidth / 2f, stripeY), 1.dp.toPx())
-                                stripeY += 7.dp.toPx()
-                            }
-                        }
                     }
                     if (point.milkMl > 0f) {
                         drawRect(

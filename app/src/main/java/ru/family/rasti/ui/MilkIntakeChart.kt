@@ -88,6 +88,7 @@ internal fun MilkIntakeChart(
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
     val plotColor = MaterialTheme.colorScheme.surface
+    val summaryFillColor = MaterialTheme.colorScheme.primary.copy(alpha = .16f)
     val nowColor = MaterialTheme.colorScheme.error
     val sleepColor = MaterialTheme.colorScheme.tertiary
     val points = remember(entries) { feedingPoints(entries) }
@@ -140,6 +141,11 @@ internal fun MilkIntakeChart(
                 .fillMaxWidth()
                 .clip(summaryShape)
                 .background(plotColor)
+                .drawBehind {
+                    if (summaryProgress > 0f) {
+                        drawRect(summaryFillColor, size = Size(size.width * summaryProgress, size.height))
+                    }
+                }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
