@@ -8,6 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 
 @Composable
 internal fun ScreenHeader(
@@ -20,7 +22,6 @@ internal fun ScreenHeader(
         Text(
             text = eyebrow.uppercase(),
             style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
@@ -36,4 +37,35 @@ internal fun ScreenHeader(
             )
         }
     }
+}
+
+/** Ordinary cards always use the same neutral surface and primary text pair. */
+@Composable
+internal fun neutralCardColors() = androidx.compose.material3.CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+)
+
+@Composable
+internal fun AppFilterChip(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val colors = MaterialTheme.colorScheme
+    androidx.compose.material3.FilterChip(
+        selected = selected, onClick = onClick, label = label, modifier = modifier, enabled = enabled,
+        leadingIcon = if (selected) { { androidx.compose.material3.Icon(Icons.Outlined.Check, contentDescription = null) } } else null,
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            containerColor = colors.surface, labelColor = colors.onSurfaceVariant,
+            selectedContainerColor = colors.primaryContainer, selectedLabelColor = colors.onPrimaryContainer,
+            selectedLeadingIconColor = colors.onPrimaryContainer,
+        ),
+        border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
+            enabled = enabled, selected = selected, borderColor = colors.outline,
+            selectedBorderColor = colors.primary, selectedBorderWidth = 1.dp,
+        ),
+    )
 }

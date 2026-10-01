@@ -2,10 +2,11 @@ package ru.family.rasti.widget
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
+import android.content.Context
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
+import ru.family.rasti.R
 import ru.family.rasti.data.AppData
 import ru.family.rasti.sleep.sleepsForDate
 import java.time.LocalDate
@@ -13,6 +14,7 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 internal fun renderWidgetTimeline(
+    context: Context,
     data: AppData,
     date: LocalDate,
     now: LocalDateTime,
@@ -34,11 +36,11 @@ internal fun renderWidgetTimeline(
     fun x(minute: Int): Float = left + minute.coerceIn(0, 1440) / 1440f * plotWidth
 
     val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(32, 255, 255, 255)
+        color = context.getColor(R.color.widget_outline_variant)
         strokeWidth = dp(1f)
     }
     val axisPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(160, 255, 255, 255)
+        color = context.getColor(R.color.widget_on_surface_variant)
         textSize = dp(8.5f)
         textAlign = Paint.Align.CENTER
     }
@@ -46,10 +48,10 @@ internal fun renderWidgetTimeline(
         canvas.drawLine(x(minute), top, x(minute), baseline, gridPaint)
         canvas.drawText((minute / 60).toString(), x(minute), height - dp(6f), axisPaint)
     }
-    canvas.drawLine(left, baseline, right, baseline, gridPaint.apply { color = Color.argb(72, 255, 255, 255) })
+    canvas.drawLine(left, baseline, right, baseline, gridPaint.apply { color = context.getColor(R.color.widget_outline) })
 
     val sleeps = sleepsForDate(data, date, now)
-    val sleepPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(135, 166, 235) }
+    val sleepPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = context.getColor(R.color.widget_chart_sleep) }
     sleeps.forEach { sleep ->
         val startX = x(sleep.startMinute)
         val endX = x(sleep.endMinute)
@@ -73,12 +75,12 @@ internal fun renderWidgetTimeline(
         val center = x(minute)
         val halfWidth = dp(3.4f)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (isMilk) Color.rgb(105, 201, 158) else Color.rgb(238, 177, 105)
+            color = context.getColor(if (isMilk) R.color.widget_chart_milk else R.color.widget_chart_formula)
         }
         canvas.drawRoundRect(
             RectF(center - halfWidth, baseline - barHeight, center + halfWidth, baseline),
-            dp(3.4f),
-            dp(3.4f),
+            if (isMilk) dp(3.4f) else 0f,
+            if (isMilk) dp(3.4f) else 0f,
             paint,
         )
     }
@@ -86,7 +88,7 @@ internal fun renderWidgetTimeline(
     if (date == now.toLocalDate()) {
         val nowMinute = now.hour * 60 + now.minute
         val nowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(180, 255, 199, 191)
+            color = context.getColor(R.color.widget_chart_attention)
             strokeWidth = dp(1f)
             pathEffect = DashPathEffect(floatArrayOf(dp(3f), dp(3f)), 0f)
         }
@@ -95,7 +97,7 @@ internal fun renderWidgetTimeline(
 
     if (feedings.isEmpty() && sleeps.isEmpty()) {
         val emptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 255, 255, 255)
+            color = context.getColor(R.color.widget_on_surface_variant)
             textSize = dp(10f)
             textAlign = Paint.Align.CENTER
         }

@@ -9,4 +9,5 @@
     <string name="widget_quick_description">Четыре крупные кнопки: молоко, смесь, сон и витамин D.</string>
     <string name="widget_timeline_name">Анюта — график дня</string>
     <string name="timeline_widget_description">Суточный график кормлений и сна</string>
+    <string name="widget_storage_error">Дневник недоступен. Нажмите, чтобы открыть приложение.</string>
 </resources>

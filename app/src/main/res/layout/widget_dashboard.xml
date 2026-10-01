@@ -13,18 +13,18 @@
             android:layout_marginEnd="3dp" android:background="@drawable/widget_panel_background" android:gravity="center_vertical" />
         <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardInfoTile"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight=".85"
-            android:layout_marginStart="3dp" android:background="@drawable/widget_vitamin_background" android:gravity="center" />
+            android:layout_marginStart="3dp" android:textColor="@color/widget_on_alert" android:background="@drawable/widget_vitamin_background" android:gravity="center" />
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="48dp"
         android:layout_marginTop="7dp" android:orientation="horizontal" android:baselineAligned="false">
         <TextView android:id="@+id/widget_milk_action" style="@style/WidgetDashboardAction"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-            android:layout_marginEnd="3dp" android:background="@drawable/widget_action_milk_background" android:text="＋ Молоко" />
+            android:layout_marginEnd="3dp" android:textColor="@color/widget_on_milk" android:background="@drawable/widget_action_milk_background" android:text="＋ Молоко" />
         <TextView android:id="@+id/widget_formula_action" style="@style/WidgetDashboardAction"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-            android:layout_marginHorizontal="3dp" android:background="@drawable/widget_action_formula_background" android:text="＋ Смесь" />
+            android:layout_marginHorizontal="3dp" android:textColor="@color/widget_on_formula" android:background="@drawable/widget_action_formula_background" android:text="＋ Смесь" />
         <TextView android:id="@+id/widget_sleep_action" style="@style/WidgetDashboardAction"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
-            android:layout_marginStart="3dp" android:background="@drawable/widget_action_sleep_background" />
+            android:layout_marginStart="3dp" android:textColor="@color/widget_on_sleep" android:background="@drawable/widget_action_sleep_background" />
     </LinearLayout>
 </LinearLayout>

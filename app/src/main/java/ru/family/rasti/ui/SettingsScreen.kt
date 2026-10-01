@@ -59,7 +59,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier, clock: java.time.Clock = java.time.Clock.systemDefaultZone()) {
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -67,7 +67,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
     val notificationPreferences = viewModel.notificationPreferences
     var childName by remember(currentProfile) { mutableStateOf(currentProfile.name) }
     var birthDate by remember(currentProfile) {
-        mutableStateOf(runCatching { LocalDate.parse(currentProfile.birthDate) }.getOrDefault(LocalDate.now().minusYears(1)))
+        mutableStateOf(runCatching { LocalDate.parse(currentProfile.birthDate) }.getOrDefault(LocalDate.now(clock).minusYears(1)))
     }
     var dueDate by remember(currentProfile) {
         mutableStateOf(runCatching { LocalDate.parse(currentProfile.dueDate) }.getOrDefault(birthDate))
@@ -132,13 +132,13 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = viewModel.appTheme == AppTheme.LIGHT,
                         onClick = { viewModel.selectAppTheme(AppTheme.LIGHT) },
                         label = { Text("Светлая") },
                         modifier = Modifier.weight(1f),
                     )
-                    FilterChip(
+                    AppFilterChip(
                         selected = viewModel.appTheme == AppTheme.DARK,
                         onClick = { viewModel.selectAppTheme(AppTheme.DARK) },
                         label = { Text("Тёмная") },
@@ -149,7 +149,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         }
         item {
             SettingsCard("Бодрствование") {
-                val ageGuide = ru.family.rasti.sleep.wakeWindowGuide(currentProfile.birthDate)
+                val ageGuide = ru.family.rasti.sleep.wakeWindowGuide(currentProfile.birthDate, LocalDate.now(clock))
                 val sourceUri = androidx.compose.ui.platform.LocalUriHandler.current
                 if (ageGuide != null) {
                     Text("Возраст: ${ageGuide.ageMonths} полных мес. · ориентир ${ru.family.rasti.sleep.formatSleepDuration(ageGuide.minimumMinutes.toLong())} — ${ru.family.rasti.sleep.formatSleepDuration(ageGuide.maximumMinutes.toLong())}")
@@ -189,9 +189,9 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     date = birthDate,
                     onDateChange = { birthDate = it },
                     modifier = Modifier.fillMaxWidth(),
-                    maximumDate = LocalDate.now(),
+                    maximumDate = LocalDate.now(clock),
                 )
-                FilterChip(
+                AppFilterChip(
                     selected = useBirthDateForLeaps,
                     onClick = { useBirthDateForLeaps = !useBirthDateForLeaps },
                     label = { Text("ПДР неизвестна — считать скачки от рождения") },
@@ -205,12 +205,12 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = sex == ChildSex.GIRL,
                         onClick = { sex = ChildSex.GIRL },
                         label = { Text("Девочка") },
                     )
-                    FilterChip(
+                    AppFilterChip(
                         selected = sex == ChildSex.BOY,
                         onClick = { sex = ChildSex.BOY },
                         label = { Text("Мальчик") },
@@ -488,7 +488,7 @@ fun SettingsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer),
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text("Важно", fontWeight = FontWeight.Bold)
@@ -548,7 +548,7 @@ private fun SettingsCard(title: String, content: @Composable ColumnScope.() -> U
             Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleLarge)
             content()
         }
     }

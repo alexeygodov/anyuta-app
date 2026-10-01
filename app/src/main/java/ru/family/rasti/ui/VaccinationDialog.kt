@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -37,6 +38,10 @@ internal fun VaccinationEditorDialog(
     val status = VaccinationStatus.valueOf(statusName)
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(if (initial == null) "Добавить прививку" else "Изменить прививку") },
         text = {
@@ -55,12 +60,12 @@ internal fun VaccinationEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = status == VaccinationStatus.PLANNED,
                         onClick = { statusName = VaccinationStatus.PLANNED.name },
                         label = { Text("Запланирована") },
                     )
-                    FilterChip(
+                    AppFilterChip(
                         selected = status == VaccinationStatus.COMPLETED,
                         onClick = { statusName = VaccinationStatus.COMPLETED.name },
                         label = { Text("Сделана") },

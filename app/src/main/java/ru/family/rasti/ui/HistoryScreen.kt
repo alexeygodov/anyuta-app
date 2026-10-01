@@ -42,10 +42,10 @@ private data class HistoryMeasurementEdit(val date: LocalDate, val measurement: 
 private data class HistorySleepEdit(val date: LocalDate, val entry: SleepEntry)
 
 @Composable
-fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier, clock: java.time.Clock = java.time.Clock.systemDefaultZone()) {
     val days = viewModel.data.days.values.sortedByDescending { it.date }
-    val weekStart = LocalDate.now().minusDays(6).toString()
-    val week = days.filter { it.date >= weekStart && it.date <= LocalDate.now().toString() }
+    val weekStart = LocalDate.now(clock).minusDays(6).toString()
+    val week = days.filter { it.date >= weekStart && it.date <= LocalDate.now(clock).toString() }
     var foodEdit by remember { mutableStateOf<HistoryFoodEdit?>(null) }
     var vitaminEdit by remember { mutableStateOf<HistoryVitaminEdit?>(null) }
     var measurementEdit by remember { mutableStateOf<HistoryMeasurementEdit?>(null) }
@@ -66,7 +66,7 @@ fun HistoryScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item { WeekReport(week) }
         if (days.isEmpty()) {
             item {
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
                     Text("Записи появятся здесь после заполнения первого дня.", Modifier.padding(20.dp))
                 }
             }
@@ -141,23 +141,25 @@ private fun WeekReport(days: List<DayRecord>) {
     val measured = days.count { it.measurement != null }
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Последние 7 дней", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                ReportValue("Заполнено", "${days.size} дн.")
-                ReportValue("Еда", foodCount.toString())
-                ReportValue("Витамины", vitaminCount.toString())
-                ReportValue("Измерения", measured.toString())
+            Text("Последние 7 дней", style = MaterialTheme.typography.titleLarge)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ReportValue("Заполнено", "${days.size} дн.", Modifier.weight(1f))
+                ReportValue("Еда", foodCount.toString(), Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ReportValue("Витамины", vitaminCount.toString(), Modifier.weight(1f))
+                ReportValue("Измерения", measured.toString(), Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-private fun ReportValue(label: String, value: String) {
-    Column {
+private fun ReportValue(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(label, style = MaterialTheme.typography.labelSmall)
     }
@@ -172,7 +174,7 @@ private fun HistoryDay(
     onSleepEdit: (SleepEntry) -> Unit,
 ) {
     val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 date?.format(DateTimeFormatter.ofPattern("d MMMM, EEEE", Locale.forLanguageTag("ru"))) ?: day.date,

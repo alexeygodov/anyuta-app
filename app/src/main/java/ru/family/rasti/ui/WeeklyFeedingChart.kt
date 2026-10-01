@@ -2,6 +2,7 @@ package ru.family.rasti.ui
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,11 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.day
 import ru.family.rasti.feeding.FeedingGuide
@@ -57,23 +60,24 @@ internal fun weeklyFeedingSummaries(data: AppData, endDate: LocalDate = LocalDat
     }
 
 @Composable
-internal fun WeeklyFeedingCard(data: AppData) {
-    val points = remember(data) { weeklyFeedingSummaries(data) }
+internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now()) {
+    val points = remember(data, endDate) { weeklyFeedingSummaries(data, endDate) }
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
+    val onFormulaColor = MaterialTheme.colorScheme.onSecondary
     val rangeColor = MaterialTheme.colorScheme.tertiary
     val axisColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Питание за 7 дней", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Питание за 7 дней", style = MaterialTheme.typography.titleLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("● Молоко", color = milkColor, style = MaterialTheme.typography.bodySmall)
-                Text("● Смесь", color = formulaColor, style = MaterialTheme.typography.bodySmall)
+                Text("▧ Смесь", color = formulaColor, style = MaterialTheme.typography.bodySmall)
                 Text("▥ Норма", color = rangeColor, style = MaterialTheme.typography.bodySmall)
             }
-            Canvas(Modifier.fillMaxWidth().height(240.dp)) {
+            Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(240.dp)) {
                 val left = 42.dp.toPx()
                 val right = size.width - 8.dp.toPx()
                 val top = 14.dp.toPx()
@@ -100,16 +104,16 @@ internal fun WeeklyFeedingCard(data: AppData) {
                             cornerRadius = CornerRadius(4.dp.toPx()),
                         )
                         drawLine(
-                            rangeColor.copy(alpha = .8f),
+                            rangeColor,
                             Offset(centerX - rangeWidth / 2f, y(point.minimumMl)),
                             Offset(centerX + rangeWidth / 2f, y(point.minimumMl)),
-                            1.dp.toPx(),
+                            1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
                         )
                         drawLine(
-                            rangeColor.copy(alpha = .8f),
+                            rangeColor,
                             Offset(centerX - rangeWidth / 2f, y(point.maximumMl)),
                             Offset(centerX + rangeWidth / 2f, y(point.maximumMl)),
-                            1.dp.toPx(),
+                            1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
                         )
                     }
                     if (point.formulaMl > 0f) {
@@ -118,6 +122,14 @@ internal fun WeeklyFeedingCard(data: AppData) {
                             topLeft = Offset(centerX - barWidth / 2f, y(point.formulaMl)),
                             size = Size(barWidth, bottom - y(point.formulaMl)),
                         )
+                        // Hatch formula bars so the two series remain distinct without colour.
+                        clipRect(centerX - barWidth / 2f, y(point.formulaMl), centerX + barWidth / 2f, bottom) {
+                            var stripeY = y(point.formulaMl) - barWidth
+                            while (stripeY < bottom) {
+                                drawLine(onFormulaColor, Offset(centerX - barWidth / 2f, stripeY + barWidth), Offset(centerX + barWidth / 2f, stripeY), 1.dp.toPx())
+                                stripeY += 7.dp.toPx()
+                            }
+                        }
                     }
                     if (point.milkMl > 0f) {
                         drawRect(
@@ -130,7 +142,7 @@ internal fun WeeklyFeedingCard(data: AppData) {
 
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = labelColor.toArgb()
-                    textSize = 10.dp.toPx()
+                    textSize = 12.sp.toPx()
                     textAlign = Paint.Align.CENTER
                 }
                 val formatter = DateTimeFormatter.ofPattern("EE\ndd", Locale.forLanguageTag("ru"))

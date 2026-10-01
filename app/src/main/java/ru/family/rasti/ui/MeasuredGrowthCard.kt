@@ -1,6 +1,7 @@
 package ru.family.rasti.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -8,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ru.family.rasti.data.AppData
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -40,21 +42,20 @@ internal fun measuredGrowthIntervals(data: AppData, weight: Boolean, today: Loca
 }
 
 @Composable
-internal fun MeasuredGrowthCard(data: AppData) {
+internal fun MeasuredGrowthCard(data: AppData, today: LocalDate = LocalDate.now()) {
     var weight by remember { mutableStateOf(true) }
-    val today = LocalDate.now()
     val points = remember(data.days, weight, today) { measuredGrowthIntervals(data, weight, today).takeLast(6) }
     val colors = MaterialTheme.colorScheme
     val formatter = remember { DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("ru")) }
     fun value(number: Double) = String.format(Locale.forLanguageTag("ru"), "%+.1f", number)
     val unit = if (weight) "г/день" else "см/30 дней"
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Темп роста", style = MaterialTheme.typography.titleLarge)
             Text("По вашим замерам · без прогноза скачков", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(weight, { weight = true }, label = { Text("Вес") })
-                FilterChip(!weight, { weight = false }, label = { Text("Рост") })
+                AppFilterChip(weight, { weight = true }, label = { Text("Вес") })
+                AppFilterChip(!weight, { weight = false }, label = { Text("Рост") })
             }
             if (points.isEmpty()) {
                 Text("Нужны два замера ${if (weight) "веса" else "роста"} с разницей не менее 7 дней.")
@@ -65,7 +66,7 @@ internal fun MeasuredGrowthCard(data: AppData) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("${point.start.format(formatter)} — ${point.end.format(formatter)} · ${point.days} дн.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                         Text("${value(rate)} $unit", style = MaterialTheme.typography.titleMedium)
-                        Canvas(Modifier.fillMaxWidth().height(18.dp)) {
+                        Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(18.dp)) {
                             val center = size.width / 2
                             drawLine(colors.outlineVariant, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 3.dp.toPx(), StrokeCap.Round)
                             drawLine(colors.outline, Offset(center, 0f), Offset(center, size.height), 1.dp.toPx())

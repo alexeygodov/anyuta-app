@@ -1,13 +1,7 @@
 package ru.family.rasti.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,6 +22,7 @@ import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,14 +30,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,15 +43,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.AppData
@@ -103,6 +93,15 @@ private data class MeasurementEditorState(
     val measurement: Measurement? = null,
 )
 
+private enum class DeletionKind { FOOD, SLEEP }
+
+private data class PendingEntryDeletion(
+    val kind: DeletionKind,
+    val date: LocalDate,
+    val id: String,
+    val description: String,
+)
+
 private data class SleepEditorState(
     val originalDate: LocalDate,
     val entry: SleepEntry? = null,
@@ -116,26 +115,19 @@ fun TodayScreen(
     modifier: Modifier = Modifier,
     widgetAction: String? = null,
     onWidgetActionConsumed: () -> Unit = {},
+    initialDate: LocalDate = LocalDate.now(),
+    clock: java.time.Clock? = null,
 ) {
-    var selectedDateRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    var lastSeenTodayRaw by rememberSaveable { mutableStateOf(LocalDate.now().toString()) }
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        fun followNewDay() {
-            val today = LocalDate.now()
-            val previousToday = LocalDate.parse(lastSeenTodayRaw)
-            if (today == previousToday) return
-            if (LocalDate.parse(selectedDateRaw) == previousToday) {
-                selectedDateRaw = today.toString()
-            }
+    var selectedDateRaw by rememberSaveable { mutableStateOf(initialDate.toString()) }
+    var lastSeenTodayRaw by rememberSaveable { mutableStateOf(LocalDate.now(clock ?: java.time.Clock.systemDefaultZone()).toString()) }
+    val now = rememberReminderTime(clock)
+    LaunchedEffect(now.toLocalDate()) {
+        val today = now.toLocalDate()
+        val previousToday = LocalDate.parse(lastSeenTodayRaw)
+        if (today != previousToday) {
+            if (LocalDate.parse(selectedDateRaw) == previousToday) selectedDateRaw = today.toString()
             lastSeenTodayRaw = today.toString()
         }
-        followNewDay()
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) followNewDay()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val selectedDate = LocalDate.parse(selectedDateRaw)
     val day = viewModel.day(selectedDate)
@@ -144,11 +136,12 @@ fun TodayScreen(
     var vitaminEditor by remember { mutableStateOf<VitaminEditorState?>(null) }
     var measurementEditor by remember { mutableStateOf<MeasurementEditorState?>(null) }
     var sleepEditor by remember { mutableStateOf<SleepEditorState?>(null) }
+    var pendingDeletion by remember { mutableStateOf<PendingEntryDeletion?>(null) }
     var note by remember(day.date, day.note) { mutableStateOf(day.note) }
 
     LaunchedEffect(widgetAction) {
         val action = widgetAction ?: return@LaunchedEffect
-        val today = LocalDate.now()
+        val today = now.toLocalDate()
         selectedDateRaw = today.toString()
         when (action) {
             WidgetAction.MILK, WidgetAction.FORMULA -> {
@@ -184,6 +177,7 @@ fun TodayScreen(
         item {
             DateNavigator(
                 date = selectedDate,
+                today = now.toLocalDate(),
                 onPrevious = { selectedDateRaw = selectedDate.minusDays(1).toString() },
                 onNext = { selectedDateRaw = selectedDate.plusDays(1).toString() },
             )
@@ -191,13 +185,15 @@ fun TodayScreen(
         if (vitaminD == null) {
             item {
                 VitaminDReminder(
-                    shouldPulse = selectedDate == LocalDate.now(),
+                    shouldPulse = shouldPulseVitaminD(selectedDate, vitaminD != null, now),
                     onClick = { vitaminEditor = VitaminEditorState(selectedDate, null, "Витамин D") },
                 )
             }
         }
         item {
             SleepControlCard(
+                now = now,
+                clock = clock,
                 wakeReminderMinutes = viewModel.wakeReminderMinutes,
                 data = viewModel.data,
                 selectedDate = selectedDate,
@@ -218,6 +214,8 @@ fun TodayScreen(
                 data = viewModel.data,
                 date = selectedDate,
                 day = day,
+                now = now,
+                clock = clock,
                 onFormula = { amount ->
                     foodEditor = FoodEditorState(selectedDate, fixedName = "Смесь", suggestedAmountMl = amount)
                 },
@@ -233,7 +231,7 @@ fun TodayScreen(
             item { EmptyHint("Снов за этот день пока нет") }
         } else {
             items(day.sleeps.sortedByDescending { it.startTime }, key = { it.id }) { entry ->
-                val duration = sleepDurationMinutes(selectedDate, entry)
+                val duration = sleepDurationMinutes(selectedDate, entry, now)
                 EntryRow(
                     title = if (entry.endTime == null) "Сон идёт" else duration?.let { "Сон · ${formatSleepDuration(it)}" } ?: "Сон",
                     subtitle = if (entry.endTime == null) {
@@ -248,11 +246,12 @@ fun TodayScreen(
                             requireEnd = entry.endTime != null,
                         )
                     },
-                    onDelete = { viewModel.removeSleep(selectedDate, entry.id) },
+                    onDelete = { pendingDeletion = PendingEntryDeletion(DeletionKind.SLEEP, selectedDate, entry.id, "сон с ${entry.startTime}") },
+                    deleteTag = "delete-sleep-${entry.id}",
                 )
             }
         }
-        item { DaySummary(viewModel.data, day) }
+        item { DaySummary(viewModel.data, day, now) }
         item { SectionHeader("Еда и питьё", onAdd = { foodEditor = FoodEditorState(selectedDate) }) }
         if (day.food.isEmpty()) {
             item { EmptyHint("Пока ничего не добавлено") }
@@ -262,7 +261,8 @@ fun TodayScreen(
                     title = entry.name,
                     subtitle = "${formatNumber(entry.amount)} ${entry.unit} · ${entry.time}",
                     onEdit = { foodEditor = FoodEditorState(selectedDate, entry) },
-                    onDelete = { viewModel.removeFood(selectedDate, entry.id) },
+                    onDelete = { pendingDeletion = PendingEntryDeletion(DeletionKind.FOOD, selectedDate, entry.id, "${entry.name} · ${formatNumber(entry.amount)} ${entry.unit} · ${entry.time}") },
+                    deleteTag = "delete-food-${entry.id}",
                 )
             }
         }
@@ -289,7 +289,7 @@ fun TodayScreen(
                 EmptyHint("Измерений за этот день нет")
             } else {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(
@@ -326,6 +326,27 @@ fun TodayScreen(
         item { Spacer(Modifier.height(8.dp)) }
     }
 
+    pendingDeletion?.let { deletion ->
+        AlertDialog(
+            onDismissRequest = { pendingDeletion = null },
+            title = { Text("Удалить запись?") },
+            text = { Text("${deletion.description}. Это действие удалит запись из дневника на ${deletion.date}.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (deletion.kind) {
+                        DeletionKind.FOOD -> if (viewModel.day(deletion.date).food.any { it.id == deletion.id }) {
+                            viewModel.removeFood(deletion.date, deletion.id)
+                        }
+                        DeletionKind.SLEEP -> if (viewModel.day(deletion.date).sleeps.any { it.id == deletion.id }) {
+                            viewModel.removeSleep(deletion.date, deletion.id)
+                        }
+                    }
+                    pendingDeletion = null
+                }) { Text("Удалить", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { pendingDeletion = null }) { Text("Отмена") } },
+        )
+    }
     foodEditor?.let { state ->
         FoodEditorDialog(
             title = when {
@@ -429,6 +450,8 @@ fun TodayScreen(
 
 @Composable
 private fun SleepControlCard(
+    now: LocalDateTime,
+    clock: java.time.Clock?,
     wakeReminderMinutes: Int,
     data: AppData,
     selectedDate: LocalDate,
@@ -443,27 +466,28 @@ private fun SleepControlCard(
             minuteTick++
         }
     }
-    val active = remember(data.days, minuteTick) { activeSleep(data) }
-    val lastCompleted = remember(data.days, minuteTick) { lastCompletedSleep(data) }
-    val awake = remember(data.days, minuteTick) { ru.family.rasti.sleep.awakeMinutes(data) }
+    val current = remember(now, minuteTick, clock) { LocalDateTime.now(clock ?: java.time.Clock.systemDefaultZone()) }
+    val active = remember(data.days, current) { activeSleep(data, current) }
+    val lastCompleted = remember(data.days, current) { lastCompletedSleep(data, current) }
+    val awake = remember(data.days, current) { ru.family.rasti.sleep.awakeMinutes(data, current) }
     val attention = ru.family.rasti.sleep.wakeAttention(awake, wakeReminderMinutes)
-    val sleepInk = lerp(MaterialTheme.colorScheme.onTertiaryContainer, MaterialTheme.colorScheme.error, attention)
-    val canStart = active == null && selectedDate <= LocalDate.now()
-    val canWake = selectedDate <= LocalDate.now()
+    val sleepInk = MaterialTheme.colorScheme.onTertiaryContainer
+    val canStart = active == null && selectedDate <= current.toLocalDate()
+    val canWake = selectedDate <= current.toLocalDate()
     val suggestedDuration = lastCompleted?.let { sleepDurationMinutes(it.startDate, it.entry)?.toInt() }
         ?.coerceIn(5, 720)
         ?: 60
     val status = active?.let { sleep ->
-        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry)
+        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry, current)
         "Спит${duration?.let { " · ${formatSleepDuration(it)}" }.orEmpty()} · с ${sleep.entry.startTime}"
     } ?: lastCompleted?.let { sleep ->
-        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry)
+        val duration = sleepDurationMinutes(sleep.startDate, sleep.entry, current)
         "Последний сон${duration?.let { " · ${formatSleepDuration(it)}" }.orEmpty()} · до ${sleep.entry.endTime}"
     } ?: "Сейчас не спит"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -475,59 +499,31 @@ private fun SleepControlCard(
                         fontWeight = FontWeight.SemiBold,
                     )
                     if (awake != null) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                    if (attention > 0f) Text("Дольше личного ориентира на ${formatSleepDuration(awake!! - wakeReminderMinutes)}", style = MaterialTheme.typography.bodySmall, color = sleepInk)
+                    if (attention > 0f) androidx.compose.material3.Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        shape = MaterialTheme.shapes.small,
+                    ) { Text("! Дольше личного ориентира на ${formatSleepDuration(awake!! - wakeReminderMinutes)}", modifier = Modifier.padding(6.dp), style = MaterialTheme.typography.bodySmall) }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = onStart, enabled = canStart, modifier = Modifier.weight(1f).height(52.dp)) {
+                Button(onClick = onStart, enabled = canStart, modifier = Modifier.weight(.85f).heightIn(min = 52.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary)) {
                     Text("Уснула")
                 }
                 Button(
                     onClick = { active?.let(onWake) ?: onQuickWake(suggestedDuration) },
                     enabled = canWake,
-                    modifier = Modifier.weight(1f).height(52.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (active != null) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer,
+                        contentColor = if (active != null) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onTertiaryContainer,
+                    ),
+                    border = if (active == null) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+                    modifier = Modifier.weight(1.15f).heightIn(min = 52.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
                 ) {
-                    Text("Проснулась")
+                    Text("Проснулась", maxLines = 1, softWrap = false)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun VitaminDReminder(
-    shouldPulse: Boolean,
-    onClick: () -> Unit,
-) {
-    val pulseTransition = rememberInfiniteTransition(label = "vitamin-d-reminder")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = if (shouldPulse) 0f else 1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(480), repeatMode = RepeatMode.Reverse),
-        label = "vitamin-d-attention",
-    )
-    FilledTonalButton(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp)
-            .graphicsLayer {
-                alpha = if (shouldPulse) .52f + pulse * .48f else 1f
-                scaleX = if (shouldPulse) .97f + pulse * .05f else 1f
-                scaleY = if (shouldPulse) .97f + pulse * .05f else 1f
-            },
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = lerp(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.errorContainer, pulse * .38f),
-            contentColor = MaterialTheme.colorScheme.onError,
-        ),
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                "ВИТАМИН D НЕ ПРИНЯТ",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text("НАЖМИТЕ СЕЙЧАС · 2 капли", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -564,6 +560,8 @@ private fun MilkProgressCard(
     data: AppData,
     date: LocalDate,
     day: DayRecord,
+    now: LocalDateTime,
+    clock: java.time.Clock?,
     onFormula: (Int?) -> Unit,
     onMilk: (Int?) -> Unit,
     onEditFood: (FoodEntry) -> Unit,
@@ -575,15 +573,10 @@ private fun MilkProgressCard(
     val consumed = milkEntries.sumOf { it.amount }
     val result = FeedingGuide.calculate(data, date)
     val guide = result.guide
-    val startColor = MaterialTheme.colorScheme.errorContainer
-    val targetColor = MaterialTheme.colorScheme.primaryContainer
-    val fallbackColor = MaterialTheme.colorScheme.secondaryContainer
     val progressToMinimum = guide?.let { (consumed / it.minimumMl).toFloat().coerceIn(0f, 1f) }
-    val desiredColor = progressToMinimum?.let { lerp(startColor, targetColor, it) } ?: fallbackColor
-    val cardColor by animateColorAsState(desiredColor, label = "feeding-progress-background")
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = cardColor),
+        colors = neutralCardColors(),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             var minuteTick by remember { mutableStateOf(0) }
@@ -593,24 +586,34 @@ private fun MilkProgressCard(
                     minuteTick++
                 }
             }
-            val lastFeeding = remember(minuteTick, date, data.days) {
-                lastFeedingInfo(date, data.days.values)
+            val current = remember(now, minuteTick, clock) { LocalDateTime.now(clock ?: java.time.Clock.systemDefaultZone()) }
+            val lastFeeding = remember(current, date, data.days) {
+                lastFeedingInfo(date, data.days.values, current)
             }
-            val smartRecommendation = remember(minuteTick, date, data.days, guide) {
-                SmartFeedingGuide.calculate(data, date, guide)
+            val smartRecommendation = remember(current, date, data.days, guide) {
+                SmartFeedingGuide.calculate(data, date, guide, current)
+            }
+            progressToMinimum?.let { progress ->
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { progress }, modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.primaryContainer,
+                )
+                Text("${(progress * 100).toInt()}% минимального ориентира", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             lastFeeding?.let { LastFeedingLabel(it) }
             smartRecommendation?.let { SmartFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = { onMilk(smartRecommendation?.amountMl) },
-                    modifier = Modifier.weight(1f).height(54.dp),
+                    modifier = Modifier.weight(1f).heightIn(min = 54.dp),
                 ) {
                     Text("Молоко")
                 }
                 Button(
                     onClick = { onFormula(smartRecommendation?.amountMl) },
-                    modifier = Modifier.weight(1f).height(54.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary),
+                    modifier = Modifier.weight(1f).heightIn(min = 54.dp),
                 ) {
                     Text("Смесь")
                 }
@@ -618,7 +621,8 @@ private fun MilkProgressCard(
             Text("Питание за сутки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             MilkIntakeChart(
                 entries = milkEntries,
-                sleepSegments = sleepsForDate(data, date),
+                now = current,
+                sleepSegments = sleepsForDate(data, date, current),
                 date = date,
                 minimumMl = guide?.minimumMl,
                 targetMl = guide?.targetMl,
@@ -702,11 +706,11 @@ private fun MilkProgressCard(
 }
 
 @Composable
-private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun DateNavigator(date: LocalDate, today: LocalDate, onPrevious: () -> Unit, onNext: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -721,8 +725,8 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
                 val dayMonth = date.format(DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru")))
                 Text(
                     when (date) {
-                        LocalDate.now() -> "Сегодня, $dayMonth"
-                        LocalDate.now().minusDays(1) -> "Вчера, $dayMonth"
+                        today -> "Сегодня, $dayMonth"
+                        today.minusDays(1) -> "Вчера, $dayMonth"
                         else -> dayMonth
                     },
                     style = MaterialTheme.typography.titleLarge,
@@ -737,9 +741,9 @@ private fun DateNavigator(date: LocalDate, onPrevious: () -> Unit, onNext: () ->
 }
 
 @Composable
-private fun DaySummary(data: AppData, day: DayRecord) {
+private fun DaySummary(data: AppData, day: DayRecord, now: LocalDateTime) {
     val totals = day.food.groupBy { it.unit }.mapValues { entry -> entry.value.sumOf { it.amount } }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(18.dp)) {
             Text("Коротко за день", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
@@ -749,7 +753,7 @@ private fun DaySummary(data: AppData, day: DayRecord) {
             )
             Text("Витамины: ${day.vitamins.size}")
             val date = runCatching { LocalDate.parse(day.date) }.getOrNull()
-            val sleepMinutes = date?.let { sleepMinutesForDate(data, it) } ?: 0L
+            val sleepMinutes = date?.let { sleepMinutesForDate(data, it, now) } ?: 0L
             Text(if (sleepMinutes > 0) "Сон: ${formatSleepDuration(sleepMinutes)}" else "Сон: нет записей")
         }
     }
@@ -771,8 +775,8 @@ private fun SectionHeader(title: String, onAdd: () -> Unit) {
 }
 
 @Composable
-private fun EntryRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun EntryRow(title: String, subtitle: String, onEdit: () -> Unit, onDelete: () -> Unit, deleteTag: String? = null) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Row(
             Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -782,7 +786,9 @@ private fun EntryRow(title: String, subtitle: String, onEdit: () -> Unit, onDele
                 Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, "Изменить") }
-            IconButton(onClick = onDelete) { Icon(Icons.Outlined.DeleteOutline, "Удалить") }
+            IconButton(onClick = onDelete, modifier = deleteTag?.let { Modifier.testTag(it) } ?: Modifier) {
+                Icon(Icons.Outlined.DeleteOutline, "Удалить")
+            }
         }
     }
 }
@@ -800,7 +806,7 @@ private fun MetricValue(label: String, value: String) {
     }
 }
 
-private fun isVitaminD(entry: VitaminEntry): Boolean {
+internal fun isVitaminD(entry: VitaminEntry): Boolean {
     val normalized = entry.name.lowercase().replace("ё", "е")
     return normalized.contains("витамин d") || normalized.contains("витамин д") || normalized.contains("d3")
 }
@@ -867,9 +873,10 @@ private fun LastFeedingLabel(info: LastFeedingInfo) {
     }
     val animatedEscalation by animateFloatAsState(escalation, label = "last-feeding-attention")
     Text(
-        text = info.text,
-        color = lerp(LocalContentColor.current, MaterialTheme.colorScheme.error, animatedEscalation),
+        text = if (escalation > 0f) "! ${info.text}" else info.text,
+        color = if (escalation > 0f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         fontSize = (15f + 6f * animatedEscalation).sp,
+        lineHeight = (21f + 6f * animatedEscalation).sp,
         fontWeight = if (animatedEscalation >= 1f) FontWeight.Bold else FontWeight.Medium,
     )
 }

@@ -29,7 +29,7 @@
                 android:layout_weight="1"
                 android:includeFontPadding="false"
                 android:text="Сегодня · 24 часа"
-                android:textColor="#EFFFFFFF"
+                android:textColor="@color/widget_on_surface"
                 android:textSize="10sp"
                 android:textStyle="bold" />
 
@@ -38,7 +38,7 @@
                 android:layout_height="wrap_content"
                 android:includeFontPadding="false"
                 android:text="● молоко"
-                android:textColor="#FF69C99E"
+                android:textColor="@color/widget_chart_milk"
                 android:textSize="8sp" />
 
             <TextView
@@ -46,8 +46,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="7dp"
                 android:includeFontPadding="false"
-                android:text="● смесь"
-                android:textColor="#FFEEB169"
+                android:text="■ смесь"
+                android:textColor="@color/widget_chart_formula"
                 android:textSize="8sp" />
 
             <TextView
@@ -56,7 +56,7 @@
                 android:layout_marginStart="7dp"
                 android:includeFontPadding="false"
                 android:text="━ сон"
-                android:textColor="#FF87A6EB"
+                android:textColor="@color/widget_chart_sleep"
                 android:textSize="8sp" />
         </LinearLayout>
 

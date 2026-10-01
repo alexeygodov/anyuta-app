@@ -97,6 +97,10 @@ internal fun FoodEditorDialog(
     }
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -167,33 +171,24 @@ internal fun VitaminEditorDialog(
     val normalizedTime = normalizeTimeToFiveMinutes(time)
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (fixedName == null) {
-                    OutlinedTextField(name, { name = it }, label = { Text("Название") }, singleLine = true)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        amount,
-                        { value -> amount = value.filter { it.isDigit() || it == ',' || it == '.' } },
-                        label = { Text("Количество") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        unit,
-                        { unit = it },
-                        label = { Text("Единица") },
-                        supportingText = { if (fixedName == "Витамин D") Text("например, капля") },
-                        modifier = Modifier.weight(1.15f),
-                        singleLine = true,
-                    )
-                }
-                TimeInput(time, onTimeChange = { time = it })
-            }
+            VitaminEditorFields(
+                name = name,
+                onNameChange = { name = it },
+                amount = amount,
+                onAmountChange = { amount = it },
+                unit = unit,
+                onUnitChange = { unit = it },
+                time = time,
+                onTimeChange = { time = it },
+                fixedName = fixedName,
+            )
         },
         confirmButton = {
             Button(
@@ -203,6 +198,45 @@ internal fun VitaminEditorDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
     )
+}
+
+
+@Composable
+internal fun VitaminEditorFields(
+    name: String,
+    onNameChange: (String) -> Unit,
+    amount: String,
+    onAmountChange: (String) -> Unit,
+    unit: String,
+    onUnitChange: (String) -> Unit,
+    time: String,
+    onTimeChange: (String) -> Unit,
+    fixedName: String?,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (fixedName == null) {
+            OutlinedTextField(name, onNameChange, label = { Text("Название") }, singleLine = true)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                amount,
+                { value -> onAmountChange(value.filter { it.isDigit() || it == ',' || it == '.' }) },
+                label = { Text("Количество") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                unit,
+                onUnitChange,
+                label = { Text("Единица") },
+                supportingText = { if (fixedName == "Витамин D") Text("например, капля") },
+                modifier = Modifier.weight(1.15f),
+                singleLine = true,
+            )
+        }
+        TimeInput(time, onTimeChange = onTimeChange)
+    }
 }
 
 @Composable
@@ -223,6 +257,10 @@ internal fun MeasurementEditorDialog(
     val normalizedTime = normalizeTimeToFiveMinutes(time)
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text("Рост и вес") },
         text = {
@@ -285,6 +323,10 @@ internal fun SleepEditorDialog(
     }
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -350,6 +392,10 @@ internal fun SleepDurationDialog(
     val startDateTime = wakeDateTime?.minusMinutes(durationMinutes.toLong())
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text("Добавить завершённый сон") },
         text = {

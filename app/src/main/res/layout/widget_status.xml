@@ -35,7 +35,7 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_milk_background"
+            android:textColor="@color/widget_on_milk" android:background="@drawable/widget_action_milk_background"
             android:text="＋ Молоко" />
 
         <TextView
@@ -45,7 +45,7 @@
             android:layout_height="match_parent"
             android:layout_marginHorizontal="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_formula_background"
+            android:textColor="@color/widget_on_formula" android:background="@drawable/widget_action_formula_background"
             android:text="＋ Смесь" />
 
         <TextView
@@ -55,6 +55,6 @@
             android:layout_height="match_parent"
             android:layout_marginStart="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_sleep_background" />
+            android:textColor="@color/widget_on_sleep" android:background="@drawable/widget_action_sleep_background" />
     </LinearLayout>
 </LinearLayout>

@@ -1,5 +1,7 @@
 package ru.family.rasti.ui
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
@@ -14,7 +16,7 @@ import ru.family.rasti.ui.theme.lightColors
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class ThemeContrastTest {
-    @Test fun primaryTextPairsAndTranslucentBottleMeetContrastFloor() {
+    @Test fun actualTextPairsAndOpaqueBottleMeetContrastFloor() {
         listOf(lightColors, darkColors).forEach { colors ->
             val pairs = listOf(
                 colors.onBackground to colors.background,
@@ -28,12 +30,53 @@ class ThemeContrastTest {
                 colors.onSecondaryContainer to colors.secondaryContainer,
                 colors.onTertiaryContainer to colors.tertiaryContainer,
                 colors.onErrorContainer to colors.errorContainer,
-                colors.onSurface to colors.surface.copy(alpha = .55f).compositeOver(colors.secondaryContainer),
+                colors.onSurface to colors.surface,
+                colors.onTertiary to colors.tertiary,
+                colors.onError to colors.error,
+                colors.inverseOnSurface to colors.inverseSurface,
+                colors.inversePrimary to colors.inverseSurface,
+                colors.onPrimaryContainer to colors.primaryContainer,
             )
-            pairs.forEach { (text, background) ->
+            val neutrals = listOf(colors.background, colors.surface, colors.surfaceDim, colors.surfaceBright,
+                colors.surfaceContainerLowest, colors.surfaceContainerLow, colors.surfaceContainer,
+                colors.surfaceContainerHigh, colors.surfaceContainerHighest, colors.surfaceVariant)
+            val actualPairs = pairs + neutrals.flatMap { listOf(colors.onSurface to it, colors.onSurfaceVariant to it) } +
+                listOf(colors.surface, colors.surfaceContainerLow).flatMap { surface ->
+                    listOf(colors.primary, colors.secondary, colors.tertiary, colors.error).map { it to surface }
+                }
+            actualPairs.forEach { (text, background) ->
                 val contrast = ColorUtils.calculateContrast(text.toArgb(), background.toArgb())
                 assertTrue("Contrast $contrast below 4.5: $text on $background", contrast >= 4.5)
             }
         }
     }
+    @Test fun vitaminTextIsOpaqueInBothModesAndEveryBorderPhase() {
+        listOf(lightColors, darkColors).forEach { colors ->
+            listOf(false, true).forEach { shouldPulse ->
+                listOf(0f, .25f, .5f, .75f, 1f).forEach { phase ->
+                    val borderAlpha = if (shouldPulse) .45f + .55f * phase else 1f
+                    val border = colors.error.copy(alpha = borderAlpha).compositeOver(colors.errorContainer)
+                    // The border is decorative; it never changes either layer behind the text.
+                    assertTrue(border.alpha == 1f)
+                    val background = colors.errorContainer.compositeOver(colors.background)
+                    val foreground = colors.onErrorContainer.compositeOver(background)
+                    assertTrue(ColorUtils.calculateContrast(foreground.toArgb(), background.toArgb()) >= 4.5)
+                }
+            }
+        }
+        // Demonstrate the original regression so reverting the pair cannot look harmless.
+        val oldBackground = lerp(lightColors.error, lightColors.errorContainer, .38f)
+        assertTrue(ColorUtils.calculateContrast(Color.White.toArgb(), oldBackground.toArgb()) < 4.5)
+    }
+
+    @Test fun significantOutlinesAndMarkersMeetThreeToOne() {
+        listOf(lightColors, darkColors).forEach { colors ->
+            listOf(colors.surface, colors.surfaceContainerLow).forEach { background ->
+                listOf(colors.outline, colors.primary, colors.secondary, colors.tertiary).forEach { foreground ->
+                    assertTrue(ColorUtils.calculateContrast(foreground.toArgb(), background.toArgb()) >= 3.0)
+                }
+            }
+        }
+    }
+
 }

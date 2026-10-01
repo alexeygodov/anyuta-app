@@ -49,7 +49,12 @@ class RastiViewModel(
     private val notifier: ReminderNotifier? = null,
     private val maxMessenger: MaxMessenger? = null,
 ) : ViewModel() {
-    var data by mutableStateOf(store.loadData())
+    private val initialLoad = runCatching { store.loadData() }
+    var storageError by mutableStateOf(initialLoad.exceptionOrNull()?.message)
+        private set
+    var dataRecovered by mutableStateOf(store.wasDataRecovered())
+        private set
+    var data by mutableStateOf(initialLoad.getOrDefault(AppData()))
         private set
     var githubConfig by mutableStateOf(store.loadGitHubConfig())
         private set
@@ -87,6 +92,21 @@ class RastiViewModel(
     }
 
     fun day(date: LocalDate): DayRecord = data.day(date)
+
+    fun retryStorage() {
+        runCatching { store.loadData() }.onSuccess {
+            data = it
+            storageError = null
+            dataRecovered = store.wasDataRecovered()
+            syncIfConfigured(showStatus = false)
+        }.onFailure { storageError = it.message }
+    }
+
+    fun acknowledgeDataRecovery() {
+        store.acknowledgeDataRecovery()
+        dataRecovered = false
+        syncIfConfigured(showStatus = false)
+    }
 
     fun saveProfile(profile: ChildProfile) {
         data = data.copy(profile = profile.copy(updatedAt = OffsetDateTime.now().toString()))
@@ -437,6 +457,7 @@ class RastiViewModel(
     }
 
     fun sync(config: GitHubConfig = githubConfig, showStatus: Boolean = true) {
+        if (storageError != null || dataRecovered) return
         saveGitHubConfig(config, showStatus = false)
         if (!hasSyncConfig(githubConfig)) return
         if (syncing) {
@@ -456,7 +477,7 @@ class RastiViewModel(
                 val merged = syncer.merge(data, result.data)
                 val updates = collectSyncUpdates(data, merged, LocalDate.now())
                 data = merged
-                persist(syncAfter = false)
+                if (!persist(syncAfter = false)) return@onSuccess
                 val encodedState = encodeSyncState(result.state)
                 syncState = encodedState
                 store.saveSyncState(encodedState)
@@ -531,9 +552,16 @@ class RastiViewModel(
         statusMessage = null
     }
 
-    private fun persist(syncAfter: Boolean = true) {
-        store.saveData(data)
+    private fun persist(syncAfter: Boolean = true): Boolean {
+        if (storageError != null || dataRecovered) return false
+        try {
+            store.saveData(data)
+        } catch (error: java.io.IOException) {
+            storageError = "Не удалось сохранить дневник. Проверьте свободное место и повторите чтение."
+            return false
+        }
         if (syncAfter) syncIfConfigured(showStatus = false)
+        return true
     }
 
     private fun currentTime(): String {

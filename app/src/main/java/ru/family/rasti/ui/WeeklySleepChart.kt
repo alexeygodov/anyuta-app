@@ -2,6 +2,7 @@ package ru.family.rasti.ui
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +23,7 @@ import ru.family.rasti.data.AppData
 import ru.family.rasti.sleep.*
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.Clock
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.max
@@ -47,9 +49,9 @@ private fun clockMinute(minute: Int) = "%02d:%02d".format(minute / 60, minute % 
 private fun shortDuration(minutes: Int) = if (minutes < 60) "${minutes}м" else "${minutes / 60}ч" + if (minutes % 60 == 0) "" else "${minutes % 60}"
 
 @Composable
-internal fun WeeklySleepCard(data: AppData) {
-    var now by remember { mutableStateOf(LocalDateTime.now()) }
-    LaunchedEffect(Unit) { while (true) { delay(60_000); now = LocalDateTime.now() } }
+internal fun WeeklySleepCard(data: AppData, clock: Clock = Clock.systemDefaultZone()) {
+    var now by remember(clock) { mutableStateOf(LocalDateTime.now(clock)) }
+    LaunchedEffect(clock) { while (true) { delay(60_000); now = LocalDateTime.now(clock) } }
     val points = remember(data.days, now) { weeklySleepSummaries(data, now.toLocalDate(), now) }
     var selected by remember { mutableStateOf(6) }
     var expanded by remember { mutableStateOf(false) }
@@ -58,7 +60,7 @@ internal fun WeeklySleepCard(data: AppData) {
     LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
     val formatter = remember { DateTimeFormatter.ofPattern("EE dd.MM", Locale.forLanguageTag("ru")) }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Сон и бодрствование", style = MaterialTheme.typography.titleLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -118,7 +120,7 @@ internal fun WeeklySleepCard(data: AppData) {
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 points.forEachIndexed { index, point ->
-                    FilterChip(selected == index, { selected = index }, label = { Text(point.date.format(formatter)) })
+                    AppFilterChip(selected == index, { selected = index }, label = { Text(point.date.format(formatter)) })
                 }
             }
             val day = points[selected]

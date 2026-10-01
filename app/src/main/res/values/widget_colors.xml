@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RemoteViews deliberately keeps the app's dark palette in every system theme. -->
+    <color name="widget_background">#101613</color>
+    <color name="widget_surface">#1D2721</color>
+    <color name="widget_on_surface">#E0E4DE</color>
+    <color name="widget_on_surface_variant">#BEC9C0</color>
+    <color name="widget_outline">#89938C</color>
+    <color name="widget_outline_variant">#3F4942</color>
+    <color name="widget_milk">#285040</color>
+    <color name="widget_on_milk">#CBEBD5</color>
+    <color name="widget_formula">#49342B</color>
+    <color name="widget_on_formula">#FFDBCC</color>
+    <color name="widget_sleep">#25344C</color>
+    <color name="widget_on_sleep">#DCE5FF</color>
+    <color name="widget_alert">#542A2B</color>
+    <color name="widget_on_alert">#FFDAD6</color>
+    <color name="widget_chart_milk">#A7D8BD</color>
+    <color name="widget_chart_formula">#FFB69A</color>
+    <color name="widget_chart_sleep">#B4C5FA</color>
+    <color name="widget_chart_attention">#FFB4AB</color>
+</resources>

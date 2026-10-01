@@ -4,14 +4,12 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.util.SizeF
 import android.widget.RemoteViews
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
-import ru.family.rasti.data.LocalStore
 import java.time.LocalDateTime
 
 object WidgetAction {
@@ -24,18 +22,18 @@ object WidgetAction {
 
 class AnyutaDashboardWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        val data = LocalStore(context).loadData()
+        val data = (loadWidgetData(context) ?: return)
         appWidgetIds.forEach { manager.updateAppWidget(it, sizedViews(context, data, manager.getAppWidgetOptions(it))) }
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle) {
-        manager.updateAppWidget(appWidgetId, sizedViews(context, LocalStore(context).loadData(), newOptions))
+        manager.updateAppWidget(appWidgetId, sizedViews(context, (loadWidgetData(context) ?: return), newOptions))
     }
 
     companion object {
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
-            val data = LocalStore(context).loadData()
+            val data = (loadWidgetData(context) ?: return)
             val component = ComponentName(context, AnyutaDashboardWidget::class.java)
             manager.getAppWidgetIds(component).forEach {
                 manager.updateAppWidget(it, sizedViews(context, data, manager.getAppWidgetOptions(it)))
@@ -105,19 +103,14 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             RemoteViews(context.packageName, R.layout.widget_dashboard_grid).apply {
                 setTextViewText(R.id.widget_milk_action, "${snapshot.feedingShort}\n＋ Молоко")
                 setTextViewText(R.id.widget_formula_action, "${snapshot.portionShort}\n＋ Смесь")
-                setTextViewText(R.id.widget_sleep_action, "${snapshot.sleepShort}\n${snapshot.sleepAction}")
+                setTextViewText(R.id.widget_sleep_action, "${snapshot.sleepShort}\n${if (snapshot.sleepAction == "Проснулась") "Подъём" else snapshot.sleepAction}")
                 setTextViewText(R.id.widget_vitamin_panel, "${snapshot.vitaminShort}\n${if (snapshot.vitaminTaken) "✓" else "＋ Отметить"}")
                 bindDashboardActions(context, this, snapshot)
             }
 
         private fun bindDashboardActions(context: Context, views: RemoteViews, snapshot: WidgetSnapshot) {
-            views.setTextColor(
-                R.id.widget_vitamin_panel,
-                if (snapshot.vitaminTaken) Color.rgb(177, 232, 183) else Color.rgb(255, 174, 167),
-            )
-            views.setTextColor(
-                R.id.widget_sleep_action,
-                androidx.core.graphics.ColorUtils.blendARGB(Color.WHITE, Color.rgb(255, 174, 167), snapshot.wakeAttention),
+            views.bindVitaminAndSleepColors(
+                context, R.id.widget_vitamin_panel, R.id.widget_sleep_action, snapshot,
             )
             views.setOnClickPendingIntent(R.id.widget_root, widgetPendingIntent(context, null, 100))
             views.setOnClickPendingIntent(R.id.widget_milk_action, widgetPendingIntent(context, WidgetAction.MILK, 101))

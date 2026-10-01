@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ru.family.rasti.data.FoodEntry
 import ru.family.rasti.sleep.SleepSegment
 import java.time.LocalDate
@@ -74,6 +75,7 @@ internal fun MilkIntakeChart(
     targetMl: Int?,
     maximumMl: Int?,
     onEntryClick: (FoodEntry) -> Unit,
+    now: java.time.LocalDateTime = java.time.LocalDateTime.now(),
 ) {
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
@@ -85,7 +87,7 @@ internal fun MilkIntakeChart(
     val outlineColor = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val plotColor = MaterialTheme.colorScheme.surfaceVariant
+    val plotColor = MaterialTheme.colorScheme.surface
     val nowColor = MaterialTheme.colorScheme.error
     val sleepColor = MaterialTheme.colorScheme.tertiary
     val points = remember(entries) { feedingPoints(entries) }
@@ -94,7 +96,7 @@ internal fun MilkIntakeChart(
     val formulaTotal = points.filterNot(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
     val progressPercent = feedingGoalProgressPercent(total, targetMl)
     val scaleMaximum = feedingCumulativeScaleMaximum(total, maximumMl)
-    val nowMinute = if (date == LocalDate.now()) LocalTime.now().toSecondOfDay() / 60 else null
+    val nowMinute = if (date == now.toLocalDate()) now.toLocalTime().toSecondOfDay() / 60 else null
     val endMinute = max(points.lastOrNull()?.minute ?: 0, nowMinute ?: 1440).coerceAtMost(1440)
     val density = LocalDensity.current
     val leftTapPadding = with(density) { 34.dp.toPx() }
@@ -137,14 +139,7 @@ internal fun MilkIntakeChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(summaryShape)
-                .background(plotColor.copy(alpha = .42f))
-                .drawBehind {
-                    drawRoundRect(
-                        color = milkColor.copy(alpha = .22f),
-                        size = Size(size.width * summaryProgress, size.height),
-                        cornerRadius = CornerRadius(16.dp.toPx()),
-                    )
-                }
+                .background(plotColor)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -211,7 +206,7 @@ internal fun MilkIntakeChart(
                 amountMl.coerceIn(0f, scaleMaximum.toFloat()) / scaleMaximum.toFloat() * plotHeight
 
             drawRoundRect(
-                color = plotColor.copy(alpha = .15f),
+                color = plotColor,
                 topLeft = Offset(left, top),
                 size = Size(plotWidth, plotHeight),
                 cornerRadius = CornerRadius(18.dp.toPx()),
@@ -259,7 +254,7 @@ internal fun MilkIntakeChart(
                             size = Size(sleepRight - sleepLeft, plotHeight),
                         )
                         drawRoundRect(
-                            color = sleepColor.copy(alpha = if (sleep.ongoing) .78f else .58f),
+                            color = sleepColor,
                             topLeft = Offset(sleepLeft, top + 3.dp.toPx()),
                             size = Size((sleepRight - sleepLeft).coerceAtLeast(3.dp.toPx()), 7.dp.toPx()),
                             cornerRadius = CornerRadius(4.dp.toPx()),
@@ -278,7 +273,7 @@ internal fun MilkIntakeChart(
                     }
                     drawPath(normBand, normColor.copy(alpha = .14f))
                     drawLine(
-                        color = normColor.copy(alpha = .72f),
+                        color = normColor,
                         start = Offset(x(viewportStart), y(expected(targetMl, viewportStart))),
                         end = Offset(x(viewportEnd), y(expected(targetMl, viewportEnd))),
                         strokeWidth = 1.4.dp.toPx(),
@@ -289,7 +284,7 @@ internal fun MilkIntakeChart(
 
                 if (nowMinute != null && nowMinute in viewportStart.roundToInt()..viewportEnd.roundToInt()) {
                     drawLine(
-                        color = nowColor.copy(alpha = .56f),
+                        color = nowColor,
                         start = Offset(x(nowMinute.toFloat()), top),
                         end = Offset(x(nowMinute.toFloat()), bottom),
                         strokeWidth = 1.2.dp.toPx(),
@@ -324,7 +319,7 @@ internal fun MilkIntakeChart(
                     )
                     drawPath(
                         path = linePath,
-                        color = actualColor.copy(alpha = .84f),
+                        color = actualColor,
                         style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
                     )
 
@@ -369,7 +364,7 @@ internal fun MilkIntakeChart(
                         .coerceIn(12, 120)
                     val labelRanges = feedingLabelGroupRanges(visiblePoints.map(FeedingPoint::minute), thresholdMinutes)
                     val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        textSize = 10.dp.toPx()
+                        textSize = 12.sp.toPx()
                         textAlign = Paint.Align.CENTER
                         isFakeBoldText = true
                     }
@@ -380,7 +375,7 @@ internal fun MilkIntakeChart(
                         val centerMinute = group.map(FeedingPoint::minute).average().toFloat()
                         val anchorY = y(group.last().cumulativeMl)
                         val chipWidth = valuePaint.measureText(label) + 16.dp.toPx()
-                        val chipHeight = 21.dp.toPx()
+                        val chipHeight = 21.sp.toPx()
                         val chipLeft = (x(centerMinute) - chipWidth / 2f).coerceIn(left, right - chipWidth)
                         val chipTop = (anchorY - chipHeight - 8.dp.toPx()).coerceIn(top + 3.dp.toPx(), bottom - chipHeight)
                         val chip = RectF(chipLeft, chipTop, chipLeft + chipWidth, chipTop + chipHeight)
@@ -416,7 +411,7 @@ internal fun MilkIntakeChart(
                     val rangeTop = y(maximumMl.toFloat())
                     val rangeBottom = y(minimumMl.toFloat())
                     drawRoundRect(
-                        color = normColor.copy(alpha = .48f),
+                        color = normColor,
                         topLeft = Offset(goalX - 5.dp.toPx(), rangeTop),
                         size = Size(10.dp.toPx(), (rangeBottom - rangeTop).coerceAtLeast(5.dp.toPx())),
                         cornerRadius = CornerRadius(5.dp.toPx()),
@@ -429,7 +424,7 @@ internal fun MilkIntakeChart(
 
             val axisPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = labelColor.toArgb()
-                textSize = 10.dp.toPx()
+                textSize = 12.sp.toPx()
             }
             drawContext.canvas.nativeCanvas.apply {
                 tickValues.forEach { value ->
@@ -462,7 +457,7 @@ internal fun MilkIntakeChart(
 @Composable
 private fun SleepLegendItem(color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(width = 13.dp, height = 6.dp).background(color.copy(alpha = .7f), RoundedCornerShape(50)))
+        Box(Modifier.size(width = 13.dp, height = 6.dp).background(color, RoundedCornerShape(50)))
         Text("Сон", style = MaterialTheme.typography.labelSmall)
     }
 }
@@ -482,7 +477,7 @@ private fun FeedingLegendItem(color: Color, isMilk: Boolean, label: String) {
 @Composable
 private fun GoalLegendItem(color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(width = 6.dp, height = 13.dp).background(color.copy(alpha = .6f), RoundedCornerShape(50)))
+        Box(Modifier.size(width = 6.dp, height = 13.dp).background(color, RoundedCornerShape(50)))
         Text("Норма", style = MaterialTheme.typography.labelSmall)
     }
 }

@@ -10,18 +10,17 @@ import android.widget.RemoteViews
 import ru.family.rasti.MainActivity
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
-import ru.family.rasti.data.LocalStore
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 class AnyutaTimelineWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        val data = LocalStore(context).loadData()
+        val data = (loadWidgetData(context) ?: return)
         appWidgetIds.forEach { manager.updateAppWidget(it, timelineViews(context, data)) }
     }
 
     companion object {
-        fun updateAll(context: Context, data: AppData = LocalStore(context).loadData()) {
+        fun updateAll(context: Context, cachedData: AppData? = null) {
+            val data = cachedData ?: loadWidgetData(context) ?: return
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, AnyutaTimelineWidget::class.java)
             manager.getAppWidgetIds(component).forEach {
@@ -29,11 +28,10 @@ class AnyutaTimelineWidget : AppWidgetProvider() {
             }
         }
 
-        internal fun timelineViews(context: Context, data: AppData): RemoteViews {
-            val today = LocalDate.now()
-            val now = LocalDateTime.now()
+        internal fun timelineViews(context: Context, data: AppData, now: LocalDateTime = LocalDateTime.now()): RemoteViews {
+            val today = now.toLocalDate()
             return RemoteViews(context.packageName, R.layout.widget_timeline).apply {
-                setImageViewBitmap(R.id.widget_timeline_image, renderWidgetTimeline(data, today, now))
+                setImageViewBitmap(R.id.widget_timeline_image, renderWidgetTimeline(context, data, today, now))
                 setOnClickPendingIntent(R.id.widget_timeline_root, openAppIntent(context))
             }
         }

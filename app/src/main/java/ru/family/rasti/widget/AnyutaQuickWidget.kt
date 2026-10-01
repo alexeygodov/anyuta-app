@@ -8,28 +8,30 @@ import android.os.Bundle
 import android.widget.RemoteViews
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
-import ru.family.rasti.data.LocalStore
+import java.time.LocalDateTime
 
 class AnyutaQuickWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        val data = LocalStore(context).loadData()
+        val data = (loadWidgetData(context) ?: return)
         appWidgetIds.forEach { manager.updateAppWidget(it, views(context, data)) }
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle) {
-        manager.updateAppWidget(appWidgetId, views(context, LocalStore(context).loadData()))
+        manager.updateAppWidget(appWidgetId, views(context, (loadWidgetData(context) ?: return)))
     }
 
     companion object {
-        fun updateAll(context: Context, data: AppData = LocalStore(context).loadData()) {
+        fun updateAll(context: Context, cachedData: AppData? = null) {
+            val data = cachedData ?: loadWidgetData(context) ?: return
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, AnyutaQuickWidget::class.java)
             manager.getAppWidgetIds(component).forEach { manager.updateAppWidget(it, views(context, data)) }
         }
 
-        internal fun views(context: Context, data: AppData): RemoteViews {
-            val snapshot = widgetSnapshot(context, data)
+        internal fun views(context: Context, data: AppData, now: LocalDateTime = LocalDateTime.now()): RemoteViews {
+            val snapshot = widgetSnapshot(context, data, now)
             return RemoteViews(context.packageName, R.layout.widget_quick_actions).apply {
+                bindVitaminAndSleepColors(context, R.id.widget_quick_vitamin, R.id.widget_quick_sleep, snapshot)
                 setTextViewText(R.id.widget_quick_milk, "＋ Молоко\n${snapshot.feedingShort}")
                 setTextViewText(R.id.widget_quick_formula, "＋ Смесь\n${snapshot.portionShort}")
                 setTextViewText(R.id.widget_quick_sleep, "${snapshot.sleepAction}\n${snapshot.sleepShort}")

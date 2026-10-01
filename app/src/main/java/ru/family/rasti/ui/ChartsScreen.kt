@@ -1,10 +1,15 @@
 package ru.family.rasti.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.Button
@@ -20,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,6 +46,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import ru.family.rasti.RastiViewModel
 import ru.family.rasti.data.AppData
 import ru.family.rasti.data.VaccinationEntry
@@ -48,6 +56,7 @@ import ru.family.rasti.growth.GrowthMetric
 import ru.family.rasti.growth.GrowthStandards
 import java.util.Locale
 import java.time.LocalDate
+import java.time.Clock
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
@@ -66,19 +75,50 @@ private data class HeightVelocityPoint(
 )
 
 @Composable
-fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
+fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier, clock: Clock = Clock.systemDefaultZone()) {
     val data = viewModel.data
     val context = LocalContext.current
     val standards = remember(context) { GrowthStandards(context) }
     var vaccinationEdit by remember { mutableStateOf<VaccinationEdit?>(null) }
+    var copied by remember(data) { mutableStateOf(false) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { WeeklyFeedingCard(data) }
-        item { WeeklySleepCard(data) }
+        item {
+            Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Анализ дневника", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Скопируйте рост, вес, питание и сон вместе с готовым запросом для LLM.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            val text = buildChartsLlmPrompt(viewModel.data, java.time.LocalDateTime.now(clock))
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Анюта: анализ дневника", text))
+                            copied = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Копировать для LLM")
+                    }
+                    Text(
+                        if (copied) "Скопировано. Проверьте текст перед отправкой в LLM."
+                        else "Имя и токены не копируются. Данные попадут в LLM только после вашей вставки.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        item { WeeklyFeedingCard(data, LocalDate.now(clock)) }
+        item { WeeklySleepCard(data, clock) }
         item {
             ScreenHeader(
                 eyebrow = "Динамика",
@@ -92,12 +132,12 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier) {
         item {
             GrowthChartCard(data, standards, GrowthMetric.WEIGHT, "Вес", "кг")
         }
-        item { MeasuredGrowthCard(data) }
-        item { DevelopmentCalendarCard(data, onFussinessChange = viewModel::saveFussiness) }
+        item { MeasuredGrowthCard(data, LocalDate.now(clock)) }
+        item { DevelopmentCalendarCard(data, onFussinessChange = viewModel::saveFussiness, today = LocalDate.now(clock)) }
         item {
             VaccinationTimelineCard(
                 data = data,
-                onAdd = { vaccinationEdit = VaccinationEdit(LocalDate.now()) },
+                onAdd = { vaccinationEdit = VaccinationEdit(LocalDate.now(clock)) },
                 onEdit = { date, entry -> vaccinationEdit = VaccinationEdit(date, entry) },
                 onDelete = viewModel::removeVaccination,
             )
@@ -150,9 +190,9 @@ private fun GrowthVelocityCard(data: AppData, standards: GrowthStandards) {
             )
         }
     }
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Скорость роста по измерениям", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Скорость роста по измерениям", style = MaterialTheme.typography.titleLarge)
             Text(
                 "Скорость изменения роста между измерениями, приведённая к 30 дням.",
                 style = MaterialTheme.typography.bodySmall,
@@ -184,7 +224,7 @@ private fun HeightVelocityCanvas(points: List<HeightVelocityPoint>) {
     val negativeColor = MaterialTheme.colorScheme.error
     val outline = MaterialTheme.colorScheme.outline
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Canvas(Modifier.fillMaxWidth().height(210.dp)) {
+    Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(210.dp)) {
         val left = 52.dp.toPx()
         val right = size.width - 12.dp.toPx()
         val top = 12.dp.toPx()
@@ -211,7 +251,7 @@ private fun HeightVelocityCanvas(points: List<HeightVelocityPoint>) {
         drawLine(outline, Offset(left, top), Offset(left, bottom), 1.dp.toPx())
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = labelColor.toArgb()
-            textSize = 10.dp.toPx()
+            textSize = 12.sp.toPx()
         }
         drawContext.canvas.nativeCanvas.apply {
             drawText(formatFloat(yMax), 2.dp.toPx(), top + 5.dp.toPx(), paint)
@@ -238,11 +278,11 @@ private fun VaccinationTimelineCard(
         }.sortedBy { it.first }
     }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("ru")) }
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Прививки", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text("Прививки", style = MaterialTheme.typography.titleLarge)
                     Text("Личный график: запланированные и сделанные", style = MaterialTheme.typography.bodySmall)
                 }
                 Button(onClick = onAdd) {
@@ -319,9 +359,9 @@ private fun GrowthChartCard(
         }.sortedBy { it.day }
     }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleLarge)
             if (points.isEmpty()) {
                 Text("Добавьте хотя бы одно измерение на экране «Сегодня».")
             } else {
@@ -349,13 +389,14 @@ private fun GrowthChartCard(
 
 @Composable
 private fun GrowthCanvas(curve: List<GrowthBand>, points: List<ChartPoint>, unit: String) {
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
     val primary = MaterialTheme.colorScheme.primary
     val bandColor = MaterialTheme.colorScheme.primaryContainer
     val outline = MaterialTheme.colorScheme.outline
     val medianColor = MaterialTheme.colorScheme.secondary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Canvas(Modifier.fillMaxWidth().height(250.dp)) {
+    Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(250.dp)) {
         val left = 44.dp.toPx()
         val right = size.width - 12.dp.toPx()
         val top = 12.dp.toPx()
@@ -423,14 +464,14 @@ private fun GrowthCanvas(curve: List<GrowthBand>, points: List<ChartPoint>, unit
         }
         visiblePoints.forEach { point ->
             drawCircle(primary, radius = 4.dp.toPx(), center = Offset(x(point.day), y(point.value)))
-            drawCircle(Color.White, radius = 1.5.dp.toPx(), center = Offset(x(point.day), y(point.value)))
+            drawCircle(onPrimary, radius = 1.5.dp.toPx(), center = Offset(x(point.day), y(point.value)))
         }
 
         drawLine(outline, Offset(left, bottom), Offset(right, bottom), 1.dp.toPx())
         drawLine(outline, Offset(left, top), Offset(left, bottom), 1.dp.toPx())
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = labelColor.toArgb()
-            textSize = 11.dp.toPx()
+            textSize = 12.sp.toPx()
         }
         drawContext.canvas.nativeCanvas.apply {
             drawText(formatFloat(yMax), 2.dp.toPx(), top + 5.dp.toPx(), paint)

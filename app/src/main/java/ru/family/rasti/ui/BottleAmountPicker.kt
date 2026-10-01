@@ -58,9 +58,11 @@ internal fun BottleAmountPicker(
 ) {
     val outlineColor = MaterialTheme.colorScheme.outline
     val glassColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .5f)
-    val tickColor = MaterialTheme.colorScheme.outline.copy(alpha = .65f)
+    val tickColor = MaterialTheme.colorScheme.outline
     val numberColor = MaterialTheme.colorScheme.onSurface
+    val unitColor = MaterialTheme.colorScheme.onSurfaceVariant
     val milkColor = MaterialTheme.colorScheme.secondaryContainer
+    val numberSize = MaterialTheme.typography.headlineLarge.fontSize
     val numberBackground = MaterialTheme.colorScheme.surface
     val currentOnChange by rememberUpdatedState(onAmountChange)
 
@@ -188,18 +190,18 @@ internal fun BottleAmountPicker(
 
             val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = numberColor.toArgb()
-                textSize = 36.sp.toPx()
+                textSize = numberSize.toPx()
                 textAlign = Paint.Align.CENTER
                 typeface = Typeface.DEFAULT_BOLD
             }
             val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = numberColor.copy(alpha = .75f).toArgb()
+                color = unitColor.toArgb()
                 textSize = 14.sp.toPx()
                 textAlign = Paint.Align.CENTER
             }
             val numberY = (bodyTop + bodyBottom) / 2 + 0.02f * h
-            // Translucent label lets the milk level show through while preserving contrast.
-            drawRoundRect(numberBackground.copy(alpha = .55f), Offset(w * .18f, numberY - 40.sp.toPx()),
+            // Opaque label preserves the same contrast at every milk level.
+            drawRoundRect(numberBackground, Offset(w * .18f, numberY - 40.sp.toPx()),
                 Size(w * .64f, 64.sp.toPx()), CornerRadius(12.dp.toPx()))
             drawContext.canvas.nativeCanvas.apply {
                 drawText("${amountMl.roundToInt()}", w / 2, numberY, numberPaint)

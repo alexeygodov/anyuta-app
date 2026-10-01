@@ -9,22 +9,23 @@ import android.view.View
 import android.widget.RemoteViews
 import ru.family.rasti.R
 import ru.family.rasti.data.AppData
-import ru.family.rasti.data.LocalStore
+import java.time.LocalDateTime
 
 class AnyutaStatusWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        val data = LocalStore(context).loadData()
+        val data = (loadWidgetData(context) ?: return)
         appWidgetIds.forEach { id ->
             manager.updateAppWidget(id, views(context, data, manager.getAppWidgetOptions(id)))
         }
     }
 
     override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle) {
-        manager.updateAppWidget(appWidgetId, views(context, LocalStore(context).loadData(), newOptions))
+        manager.updateAppWidget(appWidgetId, views(context, (loadWidgetData(context) ?: return), newOptions))
     }
 
     companion object {
-        fun updateAll(context: Context, data: AppData = LocalStore(context).loadData()) {
+        fun updateAll(context: Context, cachedData: AppData? = null) {
+            val data = cachedData ?: loadWidgetData(context) ?: return
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, AnyutaStatusWidget::class.java)
             manager.getAppWidgetIds(component).forEach { id ->
@@ -32,8 +33,13 @@ class AnyutaStatusWidget : AppWidgetProvider() {
             }
         }
 
-        internal fun views(context: Context, data: AppData, options: Bundle = Bundle()): RemoteViews {
-            val snapshot = widgetSnapshot(context, data)
+        internal fun views(
+            context: Context,
+            data: AppData,
+            options: Bundle = Bundle(),
+            now: LocalDateTime = LocalDateTime.now(),
+        ): RemoteViews {
+            val snapshot = widgetSnapshot(context, data, now)
             val status = operationalStatus(snapshot)
             val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 220)
             val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 100)
@@ -41,10 +47,18 @@ class AnyutaStatusWidget : AppWidgetProvider() {
                 setTextViewText(R.id.widget_status_title, status.title)
                 setTextViewText(R.id.widget_status_detail, status.detail)
                 setViewVisibility(R.id.widget_status_detail, if (height < 88) View.GONE else View.VISIBLE)
-                setTextViewText(R.id.widget_status_milk, if (width < 190) "Молоко" else "＋ Молоко")
+                setTextViewText(R.id.widget_status_milk, if (width < 190) "Мол." else "＋ Молоко")
                 setTextViewText(R.id.widget_status_formula, if (width < 190) "Смесь" else "＋ Смесь")
                 setTextViewText(R.id.widget_status_sleep, if (width < 190) "Сон" else snapshot.sleepAction)
                 setInt(R.id.widget_status_root, "setBackgroundResource", status.background())
+                val contentColor = context.getColor(when (status.tone) {
+                    OperationalTone.OK -> R.color.widget_on_milk
+                    OperationalTone.ATTENTION -> R.color.widget_on_formula
+                    OperationalTone.ALERT -> R.color.widget_on_alert
+                    OperationalTone.SLEEP -> R.color.widget_on_sleep
+                })
+                setTextColor(R.id.widget_status_title, contentColor)
+                setTextColor(R.id.widget_status_detail, contentColor)
                 setOnClickPendingIntent(R.id.widget_status_root, widgetPendingIntent(context, null, 200))
                 setOnClickPendingIntent(R.id.widget_status_milk, widgetPendingIntent(context, WidgetAction.MILK, 201))
                 setOnClickPendingIntent(R.id.widget_status_formula, widgetPendingIntent(context, WidgetAction.FORMULA, 202))

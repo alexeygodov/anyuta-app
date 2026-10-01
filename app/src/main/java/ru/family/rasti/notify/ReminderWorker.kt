@@ -32,7 +32,8 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val notifier = ReminderNotifier(applicationContext)
         val max = MaxMessenger(applicationContext)
         val store = LocalStore(applicationContext)
-        val data = store.loadData()
+        val data = runCatching { store.loadData() }.getOrElse { return Result.failure() }
+        if (store.wasDataRecovered()) return Result.success()
         val notificationPreferences = store.loadNotificationPreferences()
         val now = LocalDateTime.now()
         checkFeeding(notifier, max, data, now, notificationPreferences.feedingReminders)
@@ -107,7 +108,9 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val syncer = GitHubSync()
         val result = runCatching { syncer.sync(config, before, decodeSyncState(store.loadSyncState())) }
             .getOrNull() ?: return
-        val merged = syncer.merge(before, result.data)
+        val current = runCatching { store.loadData() }.getOrNull() ?: return
+        if (store.wasDataRecovered()) return
+        val merged = syncer.merge(current, result.data)
         store.saveData(merged)
         store.saveSyncState(encodeSyncState(result.state))
         notifier.markSyncedNow()

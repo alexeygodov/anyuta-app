@@ -6,23 +6,23 @@ import java.io.File
 import ru.family.rasti.widget.AnyutaDashboardWidget
 
 class LocalStore(private val context: Context) {
-    private val dataFile = File(context.filesDir, "rasti-data.json")
+    private val journal = JournalFile(context.filesDir)
     private val syncStateFile = File(context.filesDir, "rasti-sync-state.json")
     private val settings = context.getSharedPreferences("github_settings", Context.MODE_PRIVATE)
     private val tokenStore = SecureTokenStore(context)
     private val maxTokenStore = SecureTokenStore(context, "max_secret", "rasti.max.token")
 
-    fun loadData(): AppData = runCatching {
-        if (!dataFile.exists()) AppData() else JsonCodec.decodeAppData(dataFile.readText())
-    }.getOrDefault(AppData())
+    fun loadData(): AppData = journal.read()
+
+    fun wasDataRecovered(): Boolean = journal.wasRecovered()
+
+    fun acknowledgeDataRecovery() {
+        journal.acknowledgeRecovery()
+        AnyutaDashboardWidget.updateAll(context)
+    }
 
     fun saveData(data: AppData) {
-        val temporary = File(context.filesDir, "rasti-data.tmp")
-        temporary.writeText(JsonCodec.encodeAppData(data))
-        if (!temporary.renameTo(dataFile)) {
-            dataFile.writeText(temporary.readText())
-            temporary.delete()
-        }
+        journal.write(data)
         AnyutaDashboardWidget.updateAll(context)
     }
 
@@ -31,12 +31,7 @@ class LocalStore(private val context: Context) {
     }.getOrNull()
 
     fun saveSyncState(raw: String) {
-        val temporary = File(context.filesDir, "rasti-sync-state.tmp")
-        temporary.writeText(raw)
-        if (!temporary.renameTo(syncStateFile)) {
-            syncStateFile.writeText(temporary.readText())
-            temporary.delete()
-        }
+        JournalFile.writeAtomic(syncStateFile, raw)
     }
 
     fun loadGitHubConfig(): GitHubConfig = GitHubConfig(

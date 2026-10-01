@@ -8,3 +8,6 @@ keystore.properties
 *.keystore
 signing-key.base64
 .tmp-who/
+.kotlin/
+.codex-run-*/
+.local/

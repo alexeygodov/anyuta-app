@@ -22,7 +22,7 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_milk_background" />
+            android:textColor="@color/widget_on_milk" android:background="@drawable/widget_action_milk_background" />
 
         <TextView
             android:id="@+id/widget_quick_formula"
@@ -31,7 +31,7 @@
             android:layout_height="match_parent"
             android:layout_marginStart="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_formula_background" />
+            android:textColor="@color/widget_on_formula" android:background="@drawable/widget_action_formula_background" />
     </LinearLayout>
 
     <LinearLayout
@@ -49,7 +49,7 @@
             android:layout_height="match_parent"
             android:layout_marginEnd="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_action_sleep_background" />
+            android:textColor="@color/widget_on_sleep" android:background="@drawable/widget_action_sleep_background" />
 
         <TextView
             android:id="@+id/widget_quick_vitamin"
@@ -58,6 +58,6 @@
             android:layout_height="match_parent"
             android:layout_marginStart="2dp"
             android:layout_weight="1"
-            android:background="@drawable/widget_vitamin_background" />
+            android:textColor="@color/widget_on_alert" android:background="@drawable/widget_vitamin_background" />
     </LinearLayout>
 </LinearLayout>

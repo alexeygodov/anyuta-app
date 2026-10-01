@@ -20,8 +20,8 @@ android {
         applicationId = "ru.family.rasti"
         minSdk = 26
         targetSdk = 37
-        versionCode = 44
-        versionName = "0.14.0"
+        versionCode = 45
+        versionName = "0.15.0"
     }
 
     if (keystorePropertiesFile.exists()) {
@@ -86,8 +86,14 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 }
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    systemProperty("anyuta.screenshots.record", providers.gradleProperty("recordScreenshots").orElse("false").get())
+    systemProperty("anyuta.screenshots.root", layout.projectDirectory.dir("src/test/screenshots").asFile.absolutePath)
+    systemProperty("anyuta.screenshots.output", layout.buildDirectory.dir("reports/screenshots").get().asFile.absolutePath)
+    inputs.dir("src/test/screenshots").optional()
 }

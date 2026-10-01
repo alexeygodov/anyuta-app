@@ -37,8 +37,7 @@ internal fun nearbyCalendarLeap(reference: LocalDate, date: LocalDate): Calendar
         ?.takeIf { abs(ChronoUnit.DAYS.between(reference.plusWeeks(it.week.toLong()), date)) <= 7 }
 
 @Composable
-internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDate, Int?) -> Unit) {
-    val today = LocalDate.now()
+internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDate, Int?) -> Unit, today: LocalDate = LocalDate.now()) {
     val reference = leapReference(data.profile)
     var selectedDate by remember { mutableStateOf(today) }
     var showAll by remember { mutableStateOf(false) }
@@ -47,11 +46,11 @@ internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDat
     val uri = LocalUriHandler.current
     val formatter = remember { DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("ru")) }
     val density = androidx.compose.ui.platform.LocalDensity.current
-    LaunchedEffect(scroll.maxValue) { scroll.scrollTo((with(density) { (30 * 38).dp.toPx() }.toInt() - scroll.viewportSize / 2).coerceAtLeast(0)) }
+    LaunchedEffect(scroll.maxValue) { scroll.scrollTo((with(density) { (30 * 52).dp.toPx() }.toInt() - scroll.viewportSize / 2).coerceAtLeast(0)) }
     fun moodColor(level: Int?): Color = when (level) { 0 -> colors.primaryContainer; 1 -> colors.secondaryContainer; 2 -> colors.errorContainer; else -> colors.surfaceContainerHighest }
     fun moodLabel(level: Int?) = when (level) { 0 -> "Спокойно"; 1 -> "Капризничает"; 2 -> "Сильно беспокоится"; else -> "Нет отметки" }
 
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Календарь скачков развития", style = MaterialTheme.typography.titleLarge)
             Text("Условный календарь Wonder Weeks, не прогноз состояния ребёнка. Это развитие, не прибавка роста или веса.", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
@@ -65,9 +64,9 @@ internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDat
                         val date = today.plusDays(offset)
                         val near = nearbyCalendarLeap(reference, date)
                         val level = data.days[date.toString()]?.fussiness
-                        Column(Modifier.width(34.dp).clickable { selectedDate = date }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.width(48.dp).clickable { selectedDate = date }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(if (offset == 0L) "●" else "", color = colors.primary, style = MaterialTheme.typography.labelSmall)
-                            Surface(color = if (near != null) colors.secondaryContainer else colors.surfaceContainerLow, shape = MaterialTheme.shapes.small) {
+                            Surface(contentColor = if (near != null) colors.onSecondaryContainer else colors.onSurfaceVariant, color = if (near != null) colors.secondaryContainer else colors.surfaceContainerLow, shape = MaterialTheme.shapes.small) {
                                 Box(Modifier.size(34.dp, 30.dp), contentAlignment = Alignment.Center) { Text(near?.let { "≈${it.number}" } ?: "·", style = MaterialTheme.typography.labelSmall) }
                             }
                             Surface(color = moodColor(level), shape = MaterialTheme.shapes.small) {
@@ -82,7 +81,7 @@ internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDat
                     // A single tap records observation; no extra diary or skill tracking.
                     Column {
                         listOf("Спокойно", "Капризничает", "Сильно беспокоится").forEachIndexed { level, label ->
-                            FilterChip(selected = data.days[selectedDate.toString()]?.fussiness == level,
+                            AppFilterChip(selected = data.days[selectedDate.toString()]?.fussiness == level,
                                 onClick = { onFussinessChange(selectedDate, level) }, label = { Text(label) })
                         }
                         if (data.days[selectedDate.toString()]?.fussiness != null) TextButton(onClick = { onFussinessChange(selectedDate, null) }) { Text("Убрать отметку") }
@@ -95,7 +94,7 @@ internal fun DevelopmentCalendarCard(data: AppData, onFussinessChange: (LocalDat
                     val date = reference.plusWeeks(leap.week.toLong())
                     val delta = ChronoUnit.DAYS.between(today, date)
                     val close = abs(delta) <= 7
-                    Surface(color = if (close) colors.secondaryContainer else colors.surfaceContainerLow, shape = MaterialTheme.shapes.small) {
+                    Surface(contentColor = if (close) colors.onSecondaryContainer else colors.onSurface, color = if (close) colors.secondaryContainer else colors.surfaceContainerLow, shape = MaterialTheme.shapes.small) {
                         Column(Modifier.fillMaxWidth().padding(12.dp)) {
                             Text("${leap.number}. ${leap.name} · ≈${leap.week} нед.", style = MaterialTheme.typography.titleMedium)
                             Text("${date.format(formatter)} · " + when { delta < 0 -> "календарная дата прошла"; delta == 0L -> "календарный ориентир сегодня"; else -> "ориентир через $delta дн." }, style = MaterialTheme.typography.bodySmall)

@@ -14,8 +14,6 @@ import ru.family.rasti.data.isPlaceholder
 import ru.family.rasti.data.VitaminEntry
 import ru.family.rasti.data.VaccinationEntry
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -73,9 +71,10 @@ fun decodeSyncState(raw: String?): SyncState {
 
 private val DAY_PATH_PATTERN = Regex("data/\\d{4}/\\d{2}/\\d{4}-\\d{2}-\\d{2}\\.json")
 
-class GitHubSync {
+class GitHubSync(private val transport: GitHubTransport = GitHubHttpTransport()) {
     private data class Content(val raw: String, val sha: String)
     private data class Tree(val files: Map<String, String>, val etag: String?)
+    private data class ProfileWrite(val sha: String, val profile: ChildProfile, val uploaded: Boolean, val downloaded: Boolean)
 
     fun sync(config: GitHubConfig, local: AppData, state: SyncState = SyncState()): SyncResult {
         require(config.owner.isNotBlank()) { "Укажите владельца репозитория" }
@@ -90,39 +89,36 @@ class GitHubSync {
         var uploaded = 0
 
         var profile = local.profile
+        fun uploadProfile(expectedSha: String?) {
+            val result = putProfileWithConflictRetry(config, profile, expectedSha)
+            profile = result.profile
+            newFiles["profile.json"] = RemoteState(result.sha, result.profile.updatedAt)
+            if (result.uploaded) uploaded += 1
+            if (result.downloaded) downloaded += 1
+        }
         val profileSha = remoteShas["profile.json"]
         val cachedProfileUpdatedAt = state.files["profile.json"]
             ?.takeIf { it.sha == profileSha }
             ?.updatedAt
         when {
-            profileSha == null -> {
-                val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), null)
-                newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
-                uploaded += 1
-            }
+            profileSha == null -> uploadProfile(null)
             cachedProfileUpdatedAt == profile.updatedAt -> {
                 newFiles["profile.json"] = RemoteState(profileSha, cachedProfileUpdatedAt)
             }
             cachedProfileUpdatedAt != null && profile.updatedAt > cachedProfileUpdatedAt -> {
                 // Удалённый профиль не менялся, локальный новее — только отправка.
-                val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), profileSha)
-                newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
-                uploaded += 1
+                uploadProfile(profileSha)
             }
             else -> {
                 val remote = getContent(config, "profile.json")
                 if (remote == null) {
-                    val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), null)
-                    newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
-                    uploaded += 1
+                    uploadProfile(null)
                 } else {
                     downloaded += 1
                     val remoteProfile = JsonCodec.decodeProfile(remote.raw)
                     profile = newerProfile(profile, remoteProfile)
                     if (profile != remoteProfile) {
-                        val sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), remote.sha)
-                        newFiles["profile.json"] = RemoteState(sha, profile.updatedAt)
-                        uploaded += 1
+                        uploadProfile(remote.sha)
                     } else {
                         newFiles["profile.json"] = RemoteState(remote.sha, remoteProfile.updatedAt)
                     }
@@ -214,6 +210,35 @@ class GitHubSync {
         )
     }
 
+    private fun putProfileWithConflictRetry(
+        config: GitHubConfig,
+        profile: ChildProfile,
+        sha: String?,
+    ): ProfileWrite {
+        return try {
+            ProfileWrite(
+                sha = putContent(config, "profile.json", JsonCodec.encodeProfile(profile), sha),
+                profile = profile,
+                uploaded = true,
+                downloaded = false,
+            )
+        } catch (error: GitHubException) {
+            if (error.status != 409) throw error
+            val latest = getContent(config, "profile.json") ?: throw error
+            val remote = JsonCodec.decodeProfile(latest.raw)
+            val merged = newerProfile(profile, remote)
+            if (merged == remote) {
+                ProfileWrite(latest.sha, remote, uploaded = false, downloaded = true)
+            } else {
+                ProfileWrite(
+                    sha = putContent(config, "profile.json", JsonCodec.encodeProfile(merged), latest.sha),
+                    profile = merged,
+                    uploaded = true,
+                    downloaded = true,
+                )
+            }
+        }
+    }
     private fun putDayWithConflictRetry(
         config: GitHubConfig,
         path: String,
@@ -272,8 +297,6 @@ class GitHubSync {
         return JSONObject(response.body).getJSONObject("content").getString("sha")
     }
 
-    private data class Response(val status: Int, val body: String, val etag: String?)
-
     private fun request(
         config: GitHubConfig,
         method: String,
@@ -281,42 +304,15 @@ class GitHubSync {
         body: String?,
         allowedErrors: Set<Int> = emptySet(),
         headers: Map<String, String> = emptyMap(),
-    ): Response {
-        val url = "https://api.github.com/repos/${encode(config.owner)}/${encode(config.repo)}$endpoint"
-        val connection = URI(url).toURL().openConnection() as HttpURLConnection
-        return try {
-            connection.requestMethod = method
-            connection.connectTimeout = 20_000
-            connection.readTimeout = 30_000
-            connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.setRequestProperty("Authorization", "Bearer ${config.token}")
-            connection.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
-            connection.setRequestProperty("User-Agent", "Anyuta-Android")
-            headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
-            if (body != null) {
-                connection.doOutput = true
-                connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                connection.outputStream.use { it.write(body.toByteArray()) }
-            }
-            val status = connection.responseCode
-            val etag = connection.getHeaderField("ETag")
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status !in 200..299 && status !in allowedErrors) {
-                val message = runCatching { JSONObject(responseBody).optString("message") }.getOrNull()
-                    .orEmpty().ifBlank { "HTTP $status" }
-                throw GitHubException(status, message)
-            }
-            Response(status, responseBody, etag)
-        } catch (error: GitHubException) {
-            throw error
-        } catch (error: IOException) {
-            throw IOException("Не удалось подключиться к GitHub: ${error.message}", error)
-        } finally {
-            connection.disconnect()
+    ): GitHubResponse {
+        val response = transport.execute(config, method, endpoint, body, headers)
+        if (response.status !in 200..299 && response.status !in allowedErrors) {
+            val message = runCatching { JSONObject(response.body).optString("message") }.getOrNull()
+                .orEmpty().ifBlank { "HTTP ${response.status}" }
+            throw GitHubException(response.status, message)
         }
+        return response
     }
-
     private fun newerProfile(first: ChildProfile, second: ChildProfile): ChildProfile = when {
         first.isPlaceholder() && !second.isPlaceholder() -> second
         second.isPlaceholder() && !first.isPlaceholder() -> first
