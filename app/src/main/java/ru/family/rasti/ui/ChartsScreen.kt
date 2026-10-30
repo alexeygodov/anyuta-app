@@ -87,36 +87,6 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier, clock
         contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
-            Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Анализ дневника", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "Скопируйте рост, вес, питание и сон вместе с готовым запросом для LLM.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            val text = buildChartsLlmPrompt(viewModel.data, java.time.LocalDateTime.now(clock))
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Анюта: анализ дневника", text))
-                            copied = true
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Копировать для LLM")
-                    }
-                    Text(
-                        if (copied) "Скопировано. Проверьте текст перед отправкой в LLM."
-                        else "Имя и токены не копируются. Данные попадут в LLM только после вашей вставки.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
         item { WeeklyFeedingCard(data, LocalDate.now(clock)) }
         item { WeeklySleepCard(data, clock) }
         item {
@@ -149,6 +119,36 @@ fun ChartsScreen(viewModel: RastiViewModel, modifier: Modifier = Modifier, clock
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), colors = neutralCardColors()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Анализ дневника", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Скопируйте рост, вес, питание и сон вместе с готовым запросом для LLM.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            val text = buildChartsLlmPrompt(viewModel.data, java.time.LocalDateTime.now(clock))
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Анюта: анализ дневника", text))
+                            copied = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Outlined.ContentCopy, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Копировать для LLM")
+                    }
+                    Text(
+                        if (copied) "Скопировано. Проверьте текст перед отправкой в LLM."
+                        else "Имя и токены не копируются. Данные попадут в LLM только после вашей вставки.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 

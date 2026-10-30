@@ -6,8 +6,6 @@
         android:orientation="horizontal" android:baselineAligned="false">
         <TextView android:id="@+id/widget_last_feeding" style="@style/WidgetDashboardCompactInfo"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.2" />
-        <TextView android:id="@+id/widget_recommendation" style="@style/WidgetDashboardCompactInfo"
-            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
         <TextView android:id="@+id/widget_last_sleep" style="@style/WidgetDashboardCompactInfo"
             android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1.2" />
         <TextView android:id="@+id/widget_vitamin_panel" style="@style/WidgetDashboardCompactInfo"

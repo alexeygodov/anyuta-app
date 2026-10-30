@@ -4,8 +4,6 @@
     android:background="@drawable/widget_dashboard_background" android:orientation="vertical" android:padding="8dp">
     <TextView android:id="@+id/widget_last_feeding" style="@style/WidgetDashboardPrimary"
         android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLines="1" />
-    <TextView android:id="@+id/widget_recommendation" style="@style/WidgetDashboardSecondary"
-        android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
         android:layout_marginTop="7dp" android:orientation="horizontal" android:baselineAligned="false">
         <TextView android:id="@+id/widget_last_sleep" style="@style/WidgetDashboardInfoTile"

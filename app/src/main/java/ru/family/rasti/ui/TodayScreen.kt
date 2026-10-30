@@ -528,16 +528,6 @@ private fun SleepControlCard(
     }
 }
 
-@Composable
-private fun SmartFeedingLabel(recommendation: SmartFeedingRecommendation) {
-    Text(
-        text = "Расчётная порция: ${recommendation.amountMl} мл",
-        color = MaterialTheme.colorScheme.primary,
-        fontSize = 15.sp,
-        fontWeight = FontWeight.Medium,
-    )
-}
-
 private fun smartFeedingTimingText(recommendation: SmartFeedingRecommendation): String =
     when (recommendation.moment) {
         FeedingMoment.EARLY -> recommendation.minutesUntilUsual
@@ -593,7 +583,6 @@ private fun MilkProgressCard(
             }
 
             lastFeeding?.let { LastFeedingLabel(it) }
-            smartRecommendation?.let { SmartFeedingLabel(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = { onMilk(smartRecommendation?.amountMl) },
@@ -662,7 +651,6 @@ private fun MilkProgressCard(
                     if (smartRecommendation != null) {
                         Text(
                             buildString {
-                                append("Расчётная порция: ${smartRecommendation.amountMl} мл. ")
                                 append("${smartFeedingTimingText(smartRecommendation)}. ")
                                 append("Обычный объём: ${smartRecommendation.usualAmountMl} мл, ")
                                 append("обычный интервал: ${formatMinutes(smartRecommendation.usualIntervalMinutes)}. ")
@@ -676,11 +664,6 @@ private fun MilkProgressCard(
                                 }
                             },
                             style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            "Расчёт учитывает обычный объём и ритм за 7 дней, суточную цель, а также сколько и как давно ребёнок ел. Влияние недавних кормлений плавно снижается за обычный интервал. Это ориентир: сигналы голода и насыщения ребёнка важнее числа.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(result.explanation, style = MaterialTheme.typography.bodySmall)

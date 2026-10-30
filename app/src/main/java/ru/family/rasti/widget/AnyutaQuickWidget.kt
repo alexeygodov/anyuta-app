@@ -33,7 +33,7 @@ class AnyutaQuickWidget : AppWidgetProvider() {
             return RemoteViews(context.packageName, R.layout.widget_quick_actions).apply {
                 bindVitaminAndSleepColors(context, R.id.widget_quick_vitamin, R.id.widget_quick_sleep, snapshot)
                 setTextViewText(R.id.widget_quick_milk, "＋ Молоко\n${snapshot.feedingShort}")
-                setTextViewText(R.id.widget_quick_formula, "＋ Смесь\n${snapshot.portionShort}")
+                setTextViewText(R.id.widget_quick_formula, "＋ Смесь")
                 setTextViewText(R.id.widget_quick_sleep, "${snapshot.sleepAction}\n${snapshot.sleepShort}")
                 setTextViewText(
                     R.id.widget_quick_vitamin,
@@ -45,7 +45,7 @@ class AnyutaQuickWidget : AppWidgetProvider() {
                 setOnClickPendingIntent(R.id.widget_quick_sleep, widgetPendingIntent(context, WidgetAction.SLEEP, 303))
                 setOnClickPendingIntent(R.id.widget_quick_vitamin, widgetPendingIntent(context, WidgetAction.VITAMIN_D, 304))
                 setContentDescription(R.id.widget_quick_milk, "Добавить молоко. ${snapshot.feedingFull}")
-                setContentDescription(R.id.widget_quick_formula, "Добавить смесь. ${snapshot.portionFull}")
+                setContentDescription(R.id.widget_quick_formula, "Добавить смесь")
                 setContentDescription(R.id.widget_quick_sleep, "${snapshot.sleepAction}. ${snapshot.sleepFull}")
                 setContentDescription(R.id.widget_quick_vitamin, snapshot.vitaminFull)
             }

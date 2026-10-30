@@ -3,8 +3,12 @@ package ru.family.rasti.ui
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.hasScrollToIndexAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.lifecycle.ViewModelStore
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -41,6 +45,7 @@ class ChartsLlmExportUiTest {
         val clock = Clock.fixed(Instant.parse("2026-05-02T12:00:00Z"), ZoneOffset.UTC)
         try {
             compose.setContent { RastiTheme { ChartsScreen(model, clock = clock) } }
+            compose.onAllNodes(hasScrollToIndexAction()).onFirst().performScrollToNode(hasText("Копировать для LLM"))
             compose.onNodeWithText("Копировать для LLM").performClick()
             compose.runOnIdle {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

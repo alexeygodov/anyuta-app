@@ -82,7 +82,6 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         private fun fullViews(context: Context, snapshot: WidgetSnapshot): RemoteViews =
             RemoteViews(context.packageName, R.layout.widget_dashboard).apply {
                 setTextViewText(R.id.widget_last_feeding, snapshot.feedingFull)
-                setTextViewText(R.id.widget_recommendation, snapshot.portionFull)
                 setTextViewText(R.id.widget_last_sleep, snapshot.sleepFull)
                 setTextViewText(R.id.widget_vitamin_panel, snapshot.vitaminFull)
                 setTextViewText(R.id.widget_sleep_action, snapshot.sleepAction)
@@ -92,7 +91,6 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         private fun compactViews(context: Context, snapshot: WidgetSnapshot): RemoteViews =
             RemoteViews(context.packageName, R.layout.widget_dashboard_compact).apply {
                 setTextViewText(R.id.widget_last_feeding, snapshot.feedingShort)
-                setTextViewText(R.id.widget_recommendation, snapshot.portionShort)
                 setTextViewText(R.id.widget_last_sleep, snapshot.sleepShort)
                 setTextViewText(R.id.widget_vitamin_panel, snapshot.vitaminShort)
                 setTextViewText(R.id.widget_sleep_action, snapshot.sleepAction)
@@ -102,7 +100,7 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
         private fun narrowViews(context: Context, snapshot: WidgetSnapshot): RemoteViews =
             RemoteViews(context.packageName, R.layout.widget_dashboard_grid).apply {
                 setTextViewText(R.id.widget_milk_action, "${snapshot.feedingShort}\n＋ Молоко")
-                setTextViewText(R.id.widget_formula_action, "${snapshot.portionShort}\n＋ Смесь")
+                setTextViewText(R.id.widget_formula_action, "＋ Смесь")
                 setTextViewText(R.id.widget_sleep_action, "${snapshot.sleepShort}\n${if (snapshot.sleepAction == "Проснулась") "Подъём" else snapshot.sleepAction}")
                 setTextViewText(R.id.widget_vitamin_panel, "${snapshot.vitaminShort}\n${if (snapshot.vitaminTaken) "✓" else "＋ Отметить"}")
                 bindDashboardActions(context, this, snapshot)
@@ -118,7 +116,7 @@ class AnyutaDashboardWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_sleep_action, widgetPendingIntent(context, WidgetAction.SLEEP, 103))
             views.setOnClickPendingIntent(R.id.widget_vitamin_panel, widgetPendingIntent(context, WidgetAction.VITAMIN_D, 104))
             views.setContentDescription(R.id.widget_milk_action, "${snapshot.feedingFull}. Добавить молоко")
-            views.setContentDescription(R.id.widget_formula_action, "${snapshot.portionFull}. Добавить смесь")
+            views.setContentDescription(R.id.widget_formula_action, "Добавить смесь")
             views.setContentDescription(R.id.widget_sleep_action, "${snapshot.sleepFull}. ${snapshot.sleepAction}")
             views.setContentDescription(R.id.widget_vitamin_panel, "${snapshot.vitaminFull}. Открыть витамин D")
         }

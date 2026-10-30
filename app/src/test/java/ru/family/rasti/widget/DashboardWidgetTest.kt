@@ -103,10 +103,9 @@ class DashboardWidgetTest {
         }
     }
 
-    @Test fun fullDashboardRestoresPreviousInformationHierarchy() {
+    @Test fun fullDashboardShowsFeedingSleepAndVitamin() {
         val root = render(320, 180)
         assertTrue(root.findViewById<TextView>(R.id.widget_last_feeding).text.contains("Смесь 25"))
-        assertTrue(root.findViewById<TextView>(R.id.widget_recommendation).text.contains("Расчётная порция"))
         assertTrue(root.findViewById<TextView>(R.id.widget_last_sleep).text.contains("Спит"))
         assertTrue(root.findViewById<TextView>(R.id.widget_vitamin_panel).text.contains("2"))
         assertEquals("Проснулась", root.findViewById<TextView>(R.id.widget_sleep_action).text)

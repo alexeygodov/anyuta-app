@@ -33,8 +33,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -312,6 +314,7 @@ internal fun SleepEditorDialog(
     }
     var endTime by rememberSaveable(stateKey) { mutableStateOf(initial?.endTime ?: currentTime()) }
     var editingEnd by rememberSaveable(stateKey) { mutableStateOf(requireEnd) }
+    var selectingTime by remember(editingEnd) { mutableStateOf(false) }
     val normalizedStart = normalizeTimeToFiveMinutes(startTime)
     val normalizedEnd = if (requireEnd) normalizeTimeToFiveMinutes(endTime) else null
     val startDateTime = normalizedStart?.let { startDate.atTime(LocalTime.parse(it, timeFormatter)) }
@@ -349,10 +352,14 @@ internal fun SleepEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                     maximumDate = LocalDate.now(),
                 )
-                TimeInput(
-                    time = if (editingEnd) endTime else startTime,
-                    onTimeChange = { if (editingEnd) endTime = it else startTime = it },
-                )
+                // A fling from one field must never continue into the other field.
+                key(editingEnd) {
+                    TimeInput(
+                        time = if (editingEnd) endTime else startTime,
+                        onTimeChange = { if (editingEnd) endTime = it else startTime = it },
+                        onScrollInProgressChange = { selectingTime = it },
+                    )
+                }
                 if (requireEnd) {
                     Text(
                         durationMinutes?.let { "Длительность сна: ${formatSleepDuration(it)}" }
@@ -367,7 +374,7 @@ internal fun SleepEditorDialog(
         confirmButton = {
             Button(
                 onClick = { onSave(startDate, normalizedStart!!, endDate.takeIf { requireEnd }, normalizedEnd) },
-                enabled = normalizedStart != null && (!requireEnd || durationMinutes != null),
+                enabled = !selectingTime && normalizedStart != null && (!requireEnd || durationMinutes != null),
             ) { Text(if (requireEnd) "Сохранить" else "Уснула") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
@@ -384,6 +391,7 @@ internal fun SleepDurationDialog(
     val stateKey = "$initialWakeDate-$initialDurationMinutes"
     var wakeDate by rememberSaveable(stateKey) { mutableStateOf(initialWakeDate) }
     var wakeTime by rememberSaveable(stateKey) { mutableStateOf(currentTime()) }
+    var selectingTime by remember { mutableStateOf(false) }
     var durationMinutes by rememberSaveable(stateKey) {
         mutableStateOf(normalizeSleepDuration(initialDurationMinutes.toFloat()))
     }
@@ -446,7 +454,7 @@ internal fun SleepDurationDialog(
                     modifier = Modifier.fillMaxWidth(),
                     maximumDate = LocalDate.now(),
                 )
-                TimeInput(wakeTime, onTimeChange = { wakeTime = it })
+                TimeInput(wakeTime, onTimeChange = { wakeTime = it }, onScrollInProgressChange = { selectingTime = it })
                 startDateTime?.let {
                     Text(
                         "Начало будет рассчитано: ${it.toLocalDate().format(displayDateFormatter)} в ${it.toLocalTime().format(timeFormatter)}",
@@ -467,7 +475,7 @@ internal fun SleepDurationDialog(
                         normalizedWakeTime ?: wakeTime,
                     )
                 },
-                enabled = startDateTime != null,
+                enabled = !selectingTime && startDateTime != null,
             ) { Text("Сохранить сон") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
@@ -509,7 +517,17 @@ internal fun DatePickerButton(
 private val wheelItemHeight = 44.dp
 
 @Composable
-private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
+internal fun TimeInput(
+    time: String,
+    onTimeChange: (String) -> Unit,
+    onScrollInProgressChange: (Boolean) -> Unit = {},
+    nowTime: () -> String = ::currentTime,
+) {
+    var resetKey by remember { mutableStateOf(0) }
+    var scrollingHours by remember { mutableStateOf(false) }
+    var scrollingMinutes by remember { mutableStateOf(false) }
+    val scrolling = scrollingHours || scrollingMinutes
+    SideEffect { onScrollInProgressChange(scrolling) }
     val selected = normalizeTimeToFiveMinutes(time)?.let { LocalTime.parse(it, timeFormatter) }
         ?: roundedCurrentTime()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -522,6 +540,8 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
                 values = (0..23).toList(),
                 selectedValue = selected.hour,
                 label = "Часы",
+                resetKey = resetKey,
+                onScrollInProgressChange = { scrollingHours = it },
                 onValueSelected = { hour ->
                     onTimeChange(LocalTime.of(hour, selected.minute).format(timeFormatter))
                 },
@@ -533,28 +553,50 @@ private fun TimeInput(time: String, onTimeChange: (String) -> Unit) {
                 values = (0..55 step 5).toList(),
                 selectedValue = selected.minute,
                 label = "Минуты",
+                resetKey = resetKey,
+                onScrollInProgressChange = { scrollingMinutes = it },
                 onValueSelected = { minute ->
                     onTimeChange(LocalTime.of(selected.hour, minute).format(timeFormatter))
                 },
             )
         }
         Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-            FilledTonalButton(onClick = { onTimeChange(currentTime()) }) { Text("Сейчас") }
+            FilledTonalButton(onClick = {
+                resetKey++
+                onTimeChange(nowTime())
+            }) { Text("Сейчас") }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NumberWheel(
     values: List<Int>,
     selectedValue: Int,
     label: String,
+    resetKey: Int,
     onValueSelected: (Int) -> Unit,
+    onScrollInProgressChange: (Boolean) -> Unit,
 ) {
-    val listState = rememberLazyListState()
+    // External changes (including "Now") replace any pending fling. Repositioning
+    // must not be reported back as another user selection.
+    key(resetKey, values, selectedValue) {
+        NumberWheelContent(values, selectedValue, label, onValueSelected, onScrollInProgressChange)
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NumberWheelContent(
+    values: List<Int>,
+    selectedValue: Int,
+    label: String,
+    onValueSelected: (Int) -> Unit,
+    onScrollInProgressChange: (Boolean) -> Unit,
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = values.indexOf(selectedValue).coerceAtLeast(0))
     val flingBehavior = rememberSnapFlingBehavior(lazyListState = listState)
-    var positioned by remember { mutableStateOf(false) }
+    SideEffect { onScrollInProgressChange(listState.isScrollInProgress) }
     val centeredIndex by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -567,19 +609,9 @@ private fun NumberWheel(
         }
     }
 
-    LaunchedEffect(Unit) {
-        listState.scrollToItem(values.indexOf(selectedValue).coerceAtLeast(0))
-        positioned = true
-    }
     LaunchedEffect(listState.isScrollInProgress, centeredIndex) {
-        if (positioned && !listState.isScrollInProgress && centeredIndex >= 0 && values[centeredIndex] != selectedValue) {
+        if (!listState.isScrollInProgress && centeredIndex >= 0 && values[centeredIndex] != selectedValue) {
             onValueSelected(values[centeredIndex])
-        }
-    }
-    LaunchedEffect(selectedValue) {
-        val index = values.indexOf(selectedValue)
-        if (!listState.isScrollInProgress && index >= 0 && centeredIndex >= 0 && centeredIndex != index) {
-            listState.animateScrollToItem(index)
         }
     }
 

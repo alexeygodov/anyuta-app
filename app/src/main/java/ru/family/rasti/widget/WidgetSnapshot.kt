@@ -27,8 +27,6 @@ import java.time.LocalTime
 internal data class WidgetSnapshot(
     val feedingFull: String,
     val feedingShort: String,
-    val portionFull: String,
-    val portionShort: String,
     val sleepFull: String,
     val sleepShort: String,
     val sleepAction: String,
@@ -75,7 +73,6 @@ internal fun widgetSnapshot(
     val feedingShort = last?.let { (time, entry) ->
         "${entry.name} ${entry.amount.toInt()} · ${compactDuration(Duration.between(time, now).toMinutes())}"
     } ?: "Еда: нет записей"
-    val portionFull = recommendation?.let { "Расчётная порция: ${it.amountMl} мл" } ?: "Для порции нет расчёта"
     val sleepFull = when {
         active != null -> "Спит ${formatSleepDuration(sleepDuration ?: 0)} · $sleepTime"
         awake != null -> "Бодрствует ${formatSleepDuration(awake)} · последний сон $sleepTime"
@@ -91,8 +88,6 @@ internal fun widgetSnapshot(
     return WidgetSnapshot(
         feedingFull = feedingFull,
         feedingShort = feedingShort,
-        portionFull = portionFull,
-        portionShort = recommendation?.let { "Порция ${it.amountMl}" } ?: "Порция —",
         sleepFull = sleepFull,
         sleepShort = sleepShort,
         sleepAction = if (active == null) "Уснула" else "Проснулась",
@@ -121,12 +116,12 @@ internal fun operationalStatus(snapshot: WidgetSnapshot): OperationalStatus {
     return when (recommendation?.moment) {
         FeedingMoment.LATER_THAN_USUAL -> OperationalStatus(
             "Пора предложить еду",
-            "${snapshot.feedingShort} · порция ${recommendation.amountMl} мл",
+            snapshot.feedingShort,
             OperationalTone.ALERT,
         )
         FeedingMoment.USUAL_TIME -> OperationalStatus(
             "Можно кормить",
-            "${snapshot.feedingShort} · порция ${recommendation.amountMl} мл",
+            snapshot.feedingShort,
             OperationalTone.ATTENTION,
         )
         FeedingMoment.EARLY -> OperationalStatus(
