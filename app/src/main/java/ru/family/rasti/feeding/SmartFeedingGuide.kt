@@ -36,7 +36,8 @@ object SmartFeedingGuide {
         guide: MilkGuide?,
         now: LocalDateTime = LocalDateTime.now(),
     ): SmartFeedingRecommendation? {
-        if (guide == null || date != now.toLocalDate()) return null
+        // With complementary foods, a milk reference must not become a catch-up portion or schedule.
+        if (guide == null || guide.isComplementaryFeeding || date != now.toLocalDate()) return null
 
         val events = feedingEvents(data, now)
         val recentEvents = events.filter { it.dateTime >= now.minusDays(7) }

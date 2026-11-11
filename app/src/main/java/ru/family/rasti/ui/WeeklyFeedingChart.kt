@@ -38,6 +38,7 @@ internal data class DailyFeedingSummary(
     val formulaMl: Float,
     val minimumMl: Float?,
     val maximumMl: Float?,
+    val isComplementaryFeeding: Boolean = false,
 ) {
     val totalMl: Float get() = milkMl + formulaMl
 }
@@ -55,6 +56,7 @@ internal fun weeklyFeedingSummaries(data: AppData, endDate: LocalDate = LocalDat
             formulaMl = formula,
             minimumMl = guide?.minimumMl?.toFloat(),
             maximumMl = guide?.maximumMl?.toFloat(),
+            isComplementaryFeeding = guide?.isComplementaryFeeding == true,
         )
     }
 
@@ -73,7 +75,10 @@ internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("● Молоко", color = milkColor, style = MaterialTheme.typography.bodySmall)
                 Text("■ Смесь", color = formulaColor, style = MaterialTheme.typography.bodySmall)
-                Text("▥ Норма", color = rangeColor, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    if (points.any { it.isComplementaryFeeding }) "▥ Ориентир" else "▥ Норма",
+                    color = rangeColor, style = MaterialTheme.typography.bodySmall,
+                )
             }
             Canvas(Modifier.background(MaterialTheme.colorScheme.surface).fillMaxWidth().height(240.dp)) {
                 val left = 42.dp.toPx()
@@ -154,7 +159,11 @@ internal fun WeeklyFeedingCard(data: AppData, endDate: LocalDate = LocalDate.now
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                "Полупрозрачный коридор — расчётный суточный диапазон по последнему известному весу на каждую дату.",
+                if (points.any { it.isComplementaryFeeding }) {
+                    "Коридор — справочный суточный диапазон по последнему известному весу на каждую дату: до 6 месяцев 150–200 мл/кг, с 6 месяцев до года 90–120 мл/кг. Это не обязательный объём."
+                } else {
+                    "Полупрозрачный коридор — расчётный суточный диапазон по последнему известному весу на каждую дату."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

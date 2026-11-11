@@ -116,6 +116,16 @@ class SmartFeedingGuideTest {
     }
 
     @Test
+    fun weight_reference_with_complementary_foods_never_generates_a_catch_up_portion() {
+        assertNull(SmartFeedingGuide.calculate(
+            data = AppData(),
+            date = date,
+            guide = guide.copy(isComplementaryFeeding = true),
+            now = date.atTime(18, 0),
+        ))
+    }
+
+    @Test
     fun is_only_shown_for_today() {
         assertNull(
             SmartFeedingGuide.calculate(

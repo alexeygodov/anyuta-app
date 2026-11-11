@@ -44,6 +44,23 @@ class ScreenScreenshotTest {
     private val date = LocalDate.of(2026, 9, 12)
     private val clock = Clock.fixed(Instant.parse("2026-09-12T14:00:00Z"), ZoneOffset.UTC)
 
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingSixMonthsLight320Large() = captureProfile("feeding-6", false, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingSixMonthsDark320Large() = captureProfile("feeding-6", true, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun feedingEightMonthsLight360Normal() = captureProfile("feeding-8", false, 360, 1f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingEightMonthsDark320Large() = captureProfile("feeding-8", true, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingTenMonthsLight320Large() = captureProfile("feeding-10", false, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+    fun feedingTenMonthsDark360Normal() = captureProfile("feeding-10", true, 360, 1f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingWeekLight320Large() = captureProfile("feeding-week", false, 320, 1.3f)
+    @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
+    fun feedingWeekDark320Large() = captureProfile("feeding-week", true, 320, 1.3f)
+
     @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-mdpi")
     fun todayLight360Normal() = captureProfile("today", false, 360, 1f)
     @Test @Config(qualifiers = "en-rUS-w320dp-h800dp-mdpi")
@@ -275,7 +292,13 @@ class ScreenScreenshotTest {
 
     private fun captureProfile(scene: String, dark: Boolean, width: Int, fontScale: Float) {
         val store = LocalStore(RuntimeEnvironment.getApplication())
-        store.saveData(fixture())
+        val fixture = fixture().let { data ->
+            if (scene.startsWith("feeding-")) {
+                val ageMonths = scene.substringAfter("feeding-").toLongOrNull() ?: 8L
+                data.copy(profile = data.profile.copy(birthDate = date.minusMonths(ageMonths).toString()))
+            } else data
+        }
+        store.saveData(fixture)
         val model = RastiViewModel(store)
         model.selectAppTheme(if (dark) AppTheme.DARK else AppTheme.LIGHT)
         val models = ViewModelStore().apply { put("fixture", model) }
@@ -291,6 +314,16 @@ class ScreenScreenshotTest {
                         Surface(color = MaterialTheme.colorScheme.background) {
                             Box(Modifier.requiredSize(width.dp, 640.dp).testTag("capture")) {
                                 when (scene) {
+                                    "feeding-week" -> Column(Modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
+                                        WeeklyFeedingCard(model.data, endDate = date)
+                                    }
+                                    "feeding-6", "feeding-8", "feeding-10" -> Column(Modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
+                                        MilkProgressCard(
+                                            data = model.data, date = date, day = model.data.day(date),
+                                            now = LocalDateTime.now(clock), clock = clock,
+                                            onFormula = {}, onMilk = {}, onEditFood = {}, onMeasurement = {},
+                                        )
+                                    }
                                     "today" -> TodayScreen(model, initialDate = date, clock = clock)
                                     "history" -> HistoryScreen(model, clock = clock)
                                     "charts" -> ChartsScreen(model, clock = clock)
@@ -371,6 +404,14 @@ class ScreenScreenshotTest {
                 }
             }
             capture()
+            if (scene.startsWith("feeding-") && scene != "feeding-week") {
+                compose.mainClock.autoAdvance = true
+                compose.onNodeWithText("Подробности и ориентиры").performScrollTo().performClick()
+                compose.onNodeWithText("Источник:", substring = true).performScrollTo()
+                compose.mainClock.autoAdvance = false
+                compose.mainClock.advanceTimeBy(300)
+                capture("-details")
+            }
             // Each viewport is captured independently so a changed baseline does not hide later scenes.
             val scrollTargets = when (scene) {
                 "today" -> listOf("Питание за сутки", "Коротко за день", "Заметка")

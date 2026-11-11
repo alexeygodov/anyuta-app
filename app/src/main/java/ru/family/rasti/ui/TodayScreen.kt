@@ -44,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -546,7 +547,7 @@ private fun formatMinutes(minutes: Int): String = when {
 }
 
 @Composable
-private fun MilkProgressCard(
+internal fun MilkProgressCard(
     data: AppData,
     date: LocalDate,
     day: DayRecord,
@@ -562,6 +563,7 @@ private fun MilkProgressCard(
         .filter { it.name.trim().lowercase() in setOf("смесь", "молоко") }
     val result = FeedingGuide.calculate(data, date)
     val guide = result.guide
+    val uriHandler = LocalUriHandler.current
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = neutralCardColors(),
@@ -607,8 +609,16 @@ private fun MilkProgressCard(
                 minimumMl = guide?.minimumMl,
                 targetMl = guide?.targetMl,
                 maximumMl = guide?.maximumMl,
+                referenceOnly = guide?.isComplementaryFeeding == true,
                 onEntryClick = onEditFood,
             )
+            if (guide?.isComplementaryFeeding == true) {
+                Text(
+                    "Ориентир: ${guide.minimumMl}–${guide.maximumMl} мл/сутки · вес ${formatNumber(guide.weightKg)} кг от ${guide.weightDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+            }
             if (milkEntries.isEmpty()) {
                 Text(
                     "Нажмите «Смесь» или «Молоко» — здесь появится накопительный график.",
@@ -626,7 +636,12 @@ private fun MilkProgressCard(
             }
             AnimatedVisibility(visible = detailsExpanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (guide != null) {
+                    if (guide?.isComplementaryFeeding == true) {
+                        Text(
+                            "Полоса и зона справа — справочный суточный диапазон по весу. Пунктир и круг — его середина; процент и заливка показывают долю от неё. Это не норма по часам и не обязательный объём.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else if (guide != null) {
                         Text(
                             "График показывает накопленный объём за сутки. Полупрозрачная полоса — норма по времени, вертикальная зона справа — суточный диапазон, круг внутри неё — цель. Круглые маркеры означают молоко, квадратные — смесь.",
                             style = MaterialTheme.typography.bodySmall,
@@ -637,7 +652,7 @@ private fun MilkProgressCard(
                         )
                     } else {
                         Text(
-                            "Столбики показывают кормления по времени и объёму. Суточная норма появится после заполнения даты рождения и веса.",
+                            "График показывает записанные кормления по времени и объёму.",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -666,7 +681,14 @@ private fun MilkProgressCard(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+                    if (guide?.isComplementaryFeeding != true) {
+                        Text(result.explanation, style = MaterialTheme.typography.bodySmall)
+                    }
+                    result.sourceUrl?.let { url ->
+                        TextButton(onClick = { uriHandler.openUri(url) }) {
+                            Text("Источник: ${result.sourceTitle}")
+                        }
+                    }
                     Text(
                         "Суммируются смесь и измеренное молоко. Прямое грудное вскармливание в мл не оценивается; ориентируйтесь на сигналы ребёнка и рекомендации врача.",
                         style = MaterialTheme.typography.bodySmall,

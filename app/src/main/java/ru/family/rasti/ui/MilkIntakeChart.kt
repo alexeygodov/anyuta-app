@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,6 +77,7 @@ internal fun MilkIntakeChart(
     maximumMl: Int?,
     onEntryClick: (FoodEntry) -> Unit,
     now: java.time.LocalDateTime = java.time.LocalDateTime.now(),
+    referenceOnly: Boolean = false,
 ) {
     val milkColor = MaterialTheme.colorScheme.primary
     val formulaColor = MaterialTheme.colorScheme.secondary
@@ -96,7 +98,7 @@ internal fun MilkIntakeChart(
     val milkTotal = points.filter(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
     val formulaTotal = points.filterNot(FeedingPoint::isMilk).sumOf { it.amountMl.toDouble() }
     val progressPercent = feedingGoalProgressPercent(total, targetMl)
-    val scaleMaximum = feedingCumulativeScaleMaximum(total, maximumMl)
+    val scaleMaximum = feedingCumulativeScaleMaximum(total, maximumMl ?: targetMl)
     val nowMinute = if (date == now.toLocalDate()) now.toLocalTime().toSecondOfDay() / 60 else null
     val endMinute = max(points.lastOrNull()?.minute ?: 0, nowMinute ?: 1440).coerceAtMost(1440)
     val density = LocalDensity.current
@@ -150,7 +152,10 @@ internal fun MilkIntakeChart(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            Column(
+                modifier = if (referenceOnly) Modifier.weight(1f) else Modifier,
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
                 Text(
                     "${formatNumber(total)} мл",
                     style = MaterialTheme.typography.headlineSmall,
@@ -159,7 +164,7 @@ internal fun MilkIntakeChart(
                 Text(
                     buildString {
                         append(feedingCountLabel(points.size))
-                        targetMl?.let { append(" · цель ≈$it мл") }
+                        targetMl?.let { append(if (referenceOnly) "\nОриентир ≈$it мл" else " · цель ≈$it мл") }
                     },
                     color = labelColor,
                     style = MaterialTheme.typography.labelMedium,
@@ -167,7 +172,8 @@ internal fun MilkIntakeChart(
             }
             progressPercent?.let {
                 Text(
-                    "$it% цели",
+                    if (referenceOnly) "$it%" else "$it% цели",
+                    modifier = if (referenceOnly) Modifier.padding(start = 8.dp) else Modifier,
                     color = actualColor,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
@@ -268,16 +274,19 @@ internal fun MilkIntakeChart(
                     }
                 }
 
-                if (minimumMl != null && targetMl != null && maximumMl != null) {
-                    fun expected(value: Int, minute: Float): Float = value * minute.coerceIn(0f, 1440f) / 1440f
-                    val normBand = Path().apply {
-                        moveTo(x(viewportStart), y(expected(maximumMl, viewportStart)))
-                        lineTo(x(viewportEnd), y(expected(maximumMl, viewportEnd)))
-                        lineTo(x(viewportEnd), y(expected(minimumMl, viewportEnd)))
-                        lineTo(x(viewportStart), y(expected(minimumMl, viewportStart)))
-                        close()
+                if (targetMl != null) {
+                    fun expected(value: Int, minute: Float): Float =
+                        if (referenceOnly) value.toFloat() else value * minute.coerceIn(0f, 1440f) / 1440f
+                    if (minimumMl != null && maximumMl != null) {
+                        val normBand = Path().apply {
+                            moveTo(x(viewportStart), y(expected(maximumMl, viewportStart)))
+                            lineTo(x(viewportEnd), y(expected(maximumMl, viewportEnd)))
+                            lineTo(x(viewportEnd), y(expected(minimumMl, viewportEnd)))
+                            lineTo(x(viewportStart), y(expected(minimumMl, viewportStart)))
+                            close()
+                        }
+                        drawPath(normBand, normColor.copy(alpha = .14f))
                     }
-                    drawPath(normBand, normColor.copy(alpha = .14f))
                     drawLine(
                         color = normColor,
                         start = Offset(x(viewportStart), y(expected(targetMl, viewportStart))),
@@ -412,16 +421,18 @@ internal fun MilkIntakeChart(
                     }
                 }
 
-                if (minimumMl != null && targetMl != null && maximumMl != null && viewportEnd >= 1439f) {
+                if (targetMl != null && viewportEnd >= 1439f) {
                     val goalX = x(1440f) - 4.dp.toPx()
-                    val rangeTop = y(maximumMl.toFloat())
-                    val rangeBottom = y(minimumMl.toFloat())
-                    drawRoundRect(
-                        color = normColor,
-                        topLeft = Offset(goalX - 5.dp.toPx(), rangeTop),
-                        size = Size(10.dp.toPx(), (rangeBottom - rangeTop).coerceAtLeast(5.dp.toPx())),
-                        cornerRadius = CornerRadius(5.dp.toPx()),
-                    )
+                    if (minimumMl != null && maximumMl != null) {
+                        val rangeTop = y(maximumMl.toFloat())
+                        val rangeBottom = y(minimumMl.toFloat())
+                        drawRoundRect(
+                            color = normColor,
+                            topLeft = Offset(goalX - 5.dp.toPx(), rangeTop),
+                            size = Size(10.dp.toPx(), (rangeBottom - rangeTop).coerceAtLeast(5.dp.toPx())),
+                            cornerRadius = CornerRadius(5.dp.toPx()),
+                        )
+                    }
                     drawCircle(surfaceColor, 7.dp.toPx(), Offset(goalX, y(targetMl.toFloat())))
                     drawCircle(normColor, 5.dp.toPx(), Offset(goalX, y(targetMl.toFloat())))
                     drawCircle(surfaceColor, 2.dp.toPx(), Offset(goalX, y(targetMl.toFloat())))
@@ -447,15 +458,24 @@ internal fun MilkIntakeChart(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        val legend: @Composable () -> Unit = {
             FeedingLegendItem(milkColor, isMilk = true, label = "Молоко ${formatNumber(milkTotal)}")
             FeedingLegendItem(formulaColor, isMilk = false, label = "Смесь ${formatNumber(formulaTotal)}")
-            if (targetMl != null) GoalLegendItem(normColor)
+            if (targetMl != null) GoalLegendItem(normColor, if (referenceOnly) "Ориентир" else "Норма")
             if (sleepSegments.isNotEmpty()) SleepLegendItem(sleepColor)
+        }
+        if (referenceOnly) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) { legend() }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) { legend() }
         }
     }
 }
@@ -481,10 +501,10 @@ private fun FeedingLegendItem(color: Color, isMilk: Boolean, label: String) {
 }
 
 @Composable
-private fun GoalLegendItem(color: Color) {
+private fun GoalLegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Box(Modifier.size(width = 6.dp, height = 13.dp).background(color, RoundedCornerShape(50)))
-        Text("Норма", style = MaterialTheme.typography.labelSmall)
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 

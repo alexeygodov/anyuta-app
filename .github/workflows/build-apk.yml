@@ -101,6 +101,15 @@ jobs:
           APK_PATH="$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
           RELEASE_APK="anyuta-${GITHUB_REF_NAME}.apk"
           cp "$APK_PATH" "$RELEASE_APK"
+          awk -v version="${GITHUB_REF_NAME#v}" '
+            /^## / { if (found) exit; found = ($2 == version); next }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::Missing CHANGELOG notes for $GITHUB_REF_NAME"
+            exit 1
+          fi
           gh release create "$GITHUB_REF_NAME" "$RELEASE_APK" \
             --title "Анюта ${GITHUB_REF_NAME}" \
-            --generate-notes
+            --verify-tag \
+            --notes-file release-notes.md
