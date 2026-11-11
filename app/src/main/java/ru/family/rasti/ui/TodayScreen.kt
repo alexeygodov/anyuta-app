@@ -612,13 +612,6 @@ internal fun MilkProgressCard(
                 referenceOnly = guide?.isComplementaryFeeding == true,
                 onEntryClick = onEditFood,
             )
-            if (guide?.isComplementaryFeeding == true) {
-                Text(
-                    "Ориентир: ${guide.minimumMl}–${guide.maximumMl} мл/сутки · вес ${formatNumber(guide.weightKg)} кг от ${guide.weightDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(result.explanation, style = MaterialTheme.typography.bodySmall)
-            }
             if (milkEntries.isEmpty()) {
                 Text(
                     "Нажмите «Смесь» или «Молоко» — здесь появится накопительный график.",
@@ -638,7 +631,11 @@ internal fun MilkProgressCard(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (guide?.isComplementaryFeeding == true) {
                         Text(
-                            "Полоса и зона справа — справочный суточный диапазон по весу. Пунктир и круг — его середина; процент и заливка показывают долю от неё. Это не норма по часам и не обязательный объём.",
+                            "Полоса и пунктир показывают условное накопление суточного ориентира в течение дня. Вертикальная зона справа — диапазон по весу, круг — его середина. Процент и заливка — доля от середины диапазона; это не обязательный график кормлений.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Ориентир: ${guide.minimumMl}–${guide.maximumMl} мл/сутки · вес ${formatNumber(guide.weightKg)} кг от ${guide.weightDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}",
                             style = MaterialTheme.typography.bodySmall,
                         )
                     } else if (guide != null) {
@@ -681,9 +678,7 @@ internal fun MilkProgressCard(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    if (guide?.isComplementaryFeeding != true) {
-                        Text(result.explanation, style = MaterialTheme.typography.bodySmall)
-                    }
+                    Text(result.explanation, style = MaterialTheme.typography.bodySmall)
                     result.sourceUrl?.let { url ->
                         TextButton(onClick = { uriHandler.openUri(url) }) {
                             Text("Источник: ${result.sourceTitle}")

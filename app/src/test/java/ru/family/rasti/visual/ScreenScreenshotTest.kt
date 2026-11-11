@@ -403,11 +403,18 @@ class ScreenScreenshotTest {
                     }
                 }
             }
+            if (scene.startsWith("feeding-") && scene != "feeding-week") {
+                compose.onNodeWithText("В 6–12 месяцев:", substring = true).assertDoesNotExist()
+                compose.onNodeWithText("Ориентир:", substring = true).assertDoesNotExist()
+                compose.onNodeWithText("Источник:", substring = true).assertDoesNotExist()
+            }
             capture()
             if (scene.startsWith("feeding-") && scene != "feeding-week") {
                 compose.mainClock.autoAdvance = true
                 compose.onNodeWithText("Подробности и ориентиры").performScrollTo().performClick()
                 compose.onNodeWithText("Источник:", substring = true).performScrollTo()
+                compose.onNodeWithText("В 6–12 месяцев:", substring = true).assertExists()
+                compose.onNodeWithText("Ориентир:", substring = true).assertExists()
                 compose.mainClock.autoAdvance = false
                 compose.mainClock.advanceTimeBy(300)
                 capture("-details")

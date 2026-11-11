@@ -276,7 +276,7 @@ internal fun MilkIntakeChart(
 
                 if (targetMl != null) {
                     fun expected(value: Int, minute: Float): Float =
-                        if (referenceOnly) value.toFloat() else value * minute.coerceIn(0f, 1440f) / 1440f
+                        value * minute.coerceIn(0f, 1440f) / 1440f
                     if (minimumMl != null && maximumMl != null) {
                         val normBand = Path().apply {
                             moveTo(x(viewportStart), y(expected(maximumMl, viewportStart)))
